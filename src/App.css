@@ -59,7 +59,7 @@ main {
 .summary-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-bottom: 12px;
 }
 
@@ -90,7 +90,7 @@ main {
 
 .metric-card strong {
   color: var(--ink);
-  font-size: clamp(20px, 4.8vw, 34px);
+  font-size: clamp(22px, 3.2vw, 42px);
   line-height: 1;
 }
 
@@ -109,7 +109,18 @@ main {
   align-items: start;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* 固定パネルを2列分に広げる */
+.content-layout > section[aria-label="固定費とローン"] {
+  grid-column: span 2;
+}
+
+/* 戦略パネルを独立した列に */
+.content-layout > section[aria-label="貯金戦略メモ"] {
+  grid-column: 3;
+  grid-row: 2;
 }
 
 .panel {
@@ -712,6 +723,12 @@ button {
   .content-layout,
   .dual-column {
     grid-template-columns: 1fr;
+  }
+
+  .content-layout > section[aria-label="固定費とローン"],
+  .content-layout > section[aria-label="貯金戦略メモ"] {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .panel {
