@@ -253,6 +253,14 @@ function normalizeData(importedData: Partial<AppData>): AppData {
     createdAt: note.createdAt || todayValue(),
   }))
 
+  const savingsGoals = (importedData.savingsGoals ?? []).map((goal) => ({
+    id: goal.id || createId(),
+    name: goal.name || '',
+    targetAmount: Number(goal.targetAmount) || 0,
+    savedAmount: Number(goal.savedAmount) || 0,
+    memo: goal.memo || '',
+  }))
+
   return {
     expenses,
     fixedCosts,
@@ -263,6 +271,7 @@ function normalizeData(importedData: Partial<AppData>): AppData {
       extraPayment: Number(importedSettings.extraPayment) || 0,
     },
     strategyNotes,
+    savingsGoals,
   }
 }
 
