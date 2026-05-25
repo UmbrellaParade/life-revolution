@@ -1,6 +1,8 @@
 import {
   CalendarClock,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   CircleDollarSign,
   ClipboardList,
   CreditCard,
@@ -34,6 +36,7 @@ type FixedCost = {
   amount: number
   dueDay: number
   method: string
+  loanId?: string
   active: boolean
 }
 
@@ -42,6 +45,7 @@ type Loan = {
   name: string
   balance: number
   monthlyPayment: number
+  extraPayment: number
   apr: number
   kind: string
 }
@@ -49,7 +53,7 @@ type Loan = {
 type Settings = {
   monthlyIncome: number
   bufferTarget: number
-  extraPayment: number
+  extraPayment?: number
 }
 
 type AppData = {
@@ -82,6 +86,8 @@ const paymentMethods = [
   '現金',
   'その他',
 ]
+
+const loanKinds = ['ショッピング', 'キャッシング', 'カードローン', '奨学金']
 
 const defaultData: AppData = {
   expenses: [],
@@ -124,31 +130,48 @@ function monthKey(date: Date) {
   return toDateValue(date).slice(0, 7)
 }
 
+function addMonths(month: string, diff: number) {
+  const [year, monthIndex] = month.split('-').map(Number)
+  return monthKey(new Date(year, monthIndex - 1 + diff, 1))
+}
+
+function monthDistance(fromMonth: string, toMonth: string) {
+  const [fromYear, fromIndex] = fromMonth.split('-').map(Number)
+  const [toYear, toIndex] = toMonth.split('-').map(Number)
+  return (toYear - fromYear) * 12 + (toIndex - fromIndex)
+}
+
+function monthLabel(month: string) {
+  const [year, monthIndex] = month.split('-')
+  return `${year}年${Number(monthIndex)}月`
+}
+
 function yen(value: number) {
   return currencyFormatter.format(Math.round(value || 0))
 }
 
-function loadData(): AppData {
-  try {
-    const raw = localStorage.getItem(storageKey)
-    if (!raw) return defaultData
-    const parsed = JSON.parse(raw) as Partial<AppData>
-
-    return {
-      expenses: parsed.expenses ?? [],
-      fixedCosts: parsed.fixedCosts ?? [],
-      loans: parsed.loans ?? [],
-      settings: {
-        ...defaultData.settings,
-        ...parsed.settings,
-      },
-    }
-  } catch {
-    return defaultData
+function inferLoanId(cost: Partial<FixedCost>, loans: Loan[]) {
+  if (cost.loanId && loans.some((loan) => loan.id === cost.loanId)) {
+    return cost.loanId
   }
+
+  return loans.find((loan) => loan.name === cost.method || loan.name === cost.name)?.id
 }
 
-function normalizeImportedData(importedData: Partial<AppData>): AppData {
+function normalizeData(importedData: Partial<AppData>): AppData {
+  const importedSettings: Partial<Settings> = importedData.settings ?? {}
+  const loans = (importedData.loans ?? [])
+    .map((loan) => ({
+      id: loan.id || createId(),
+      name: loan.name || '',
+      balance: Number(loan.balance) || 0,
+      monthlyPayment: Number(loan.monthlyPayment) || 0,
+      extraPayment: Number(loan.extraPayment) || 0,
+      apr: Number(loan.apr) || 0,
+      kind: loan.kind || 'ローン',
+    }))
+    .filter((loan) => loan.name && loan.balance > 0)
+
   const expenses = (importedData.expenses ?? [])
     .map((expense) => ({
       id: expense.id || createId(),
@@ -167,29 +190,31 @@ function normalizeImportedData(importedData: Partial<AppData>): AppData {
       amount: Number(cost.amount) || 0,
       dueDay: Math.min(Math.max(Number(cost.dueDay) || 1, 1), 31),
       method: cost.method || paymentMethods[0],
+      loanId: inferLoanId(cost, loans),
       active: cost.active ?? true,
     }))
     .filter((cost) => cost.name && cost.amount > 0)
-
-  const loans = (importedData.loans ?? [])
-    .map((loan) => ({
-      id: loan.id || createId(),
-      name: loan.name || '',
-      balance: Number(loan.balance) || 0,
-      monthlyPayment: Number(loan.monthlyPayment) || 0,
-      apr: Number(loan.apr) || 0,
-      kind: loan.kind || 'ローン',
-    }))
-    .filter((loan) => loan.name && loan.balance > 0)
 
   return {
     expenses,
     fixedCosts,
     loans,
     settings: {
-      ...defaultData.settings,
-      ...importedData.settings,
+      monthlyIncome: Number(importedSettings.monthlyIncome) || 0,
+      bufferTarget: Number(importedSettings.bufferTarget) || 0,
+      extraPayment: Number(importedSettings.extraPayment) || 0,
     },
+  }
+}
+
+function loadData(): AppData {
+  try {
+    const raw = localStorage.getItem(storageKey)
+    if (!raw) return defaultData
+
+    return normalizeData(JSON.parse(raw) as Partial<AppData>)
+  } catch {
+    return defaultData
   }
 }
 
@@ -205,8 +230,23 @@ function estimateMonths(principal: number, monthlyPayment: number, apr: number) 
   )
 }
 
+function projectBalance(loan: Loan, months: number) {
+  let balance = loan.balance
+  const monthlyRate = loan.apr > 0 ? loan.apr / 100 / 12 : 0
+  const payment = loan.monthlyPayment + loan.extraPayment
+
+  for (let index = 0; index < months; index += 1) {
+    if (balance <= 0) return 0
+    balance += balance * monthlyRate
+    balance -= payment
+  }
+
+  return Math.max(0, balance)
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard')
+  const [selectedMonth, setSelectedMonth] = useState(() => monthKey(new Date()))
   const [data, setData] = useState<AppData>(() => loadData())
   const [expenseDraft, setExpenseDraft] = useState({
     amount: '',
@@ -220,13 +260,15 @@ function App() {
     amount: '',
     dueDay: '1',
     method: paymentMethods[0],
+    loanId: '',
   })
   const [loanDraft, setLoanDraft] = useState({
     name: '',
     balance: '',
     monthlyPayment: '',
+    extraPayment: '',
     apr: '',
-    kind: 'ショッピング',
+    kind: loanKinds[0],
   })
   const [importText, setImportText] = useState('')
   const [importMessage, setImportMessage] = useState('')
@@ -236,11 +278,21 @@ function App() {
   }, [data])
 
   const currentMonth = monthKey(new Date())
+  const forecastMonths = Math.max(0, monthDistance(currentMonth, selectedMonth))
 
   const monthlyExpenses = useMemo(
-    () => data.expenses.filter((expense) => expense.date.startsWith(currentMonth)),
-    [currentMonth, data.expenses],
+    () => data.expenses.filter((expense) => expense.date.startsWith(selectedMonth)),
+    [data.expenses, selectedMonth],
   )
+
+  const loanFixedTotals = useMemo(() => {
+    return data.fixedCosts.reduce<Record<string, number>>((totals, cost) => {
+      if (cost.active && cost.loanId) {
+        totals[cost.loanId] = (totals[cost.loanId] ?? 0) + cost.amount
+      }
+      return totals
+    }, {})
+  }, [data.fixedCosts])
 
   const totals = useMemo(() => {
     const variableSpent = monthlyExpenses.reduce(
@@ -250,11 +302,20 @@ function App() {
     const fixedTotal = data.fixedCosts
       .filter((cost) => cost.active)
       .reduce((sum, cost) => sum + cost.amount, 0)
-    const loanPaymentTotal = data.loans.reduce(
+    const baseLoanPaymentTotal = data.loans.reduce(
       (sum, loan) => sum + loan.monthlyPayment,
       0,
     )
+    const extraPaymentTotal = data.loans.reduce(
+      (sum, loan) => sum + loan.extraPayment,
+      0,
+    )
+    const loanPaymentTotal = baseLoanPaymentTotal + extraPaymentTotal
     const debtTotal = data.loans.reduce((sum, loan) => sum + loan.balance, 0)
+    const projectedDebtTotal = data.loans.reduce(
+      (sum, loan) => sum + projectBalance(loan, forecastMonths),
+      0,
+    )
     const weightedApr =
       debtTotal > 0
         ? data.loans.reduce((sum, loan) => sum + loan.balance * loan.apr, 0) /
@@ -268,21 +329,24 @@ function App() {
     const remaining = data.settings.monthlyIncome - plannedOutflow
     const payoffMonths = estimateMonths(
       debtTotal,
-      loanPaymentTotal + data.settings.extraPayment,
+      loanPaymentTotal,
       weightedApr,
     )
 
     return {
       variableSpent,
       fixedTotal,
+      baseLoanPaymentTotal,
+      extraPaymentTotal,
       loanPaymentTotal,
       debtTotal,
+      projectedDebtTotal,
       weightedApr,
       plannedOutflow,
       remaining,
       payoffMonths,
     }
-  }, [data.fixedCosts, data.loans, data.settings, monthlyExpenses])
+  }, [data.fixedCosts, data.loans, data.settings, forecastMonths, monthlyExpenses])
 
   const nextLoanTarget = useMemo(() => {
     return [...data.loans].sort((a, b) => b.apr - a.apr || b.balance - a.balance)[0]
@@ -302,6 +366,15 @@ function App() {
     }))
   }
 
+  function changeSelectedMonth(month: string) {
+    if (!month) return
+    setSelectedMonth(month)
+    setExpenseDraft((current) => ({
+      ...current,
+      date: current.date.startsWith(month) ? current.date : `${month}-01`,
+    }))
+  }
+
   function addExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const amount = Number(expenseDraft.amount)
@@ -313,7 +386,7 @@ function App() {
       category: expenseDraft.category,
       method: expenseDraft.method,
       memo: expenseDraft.memo.trim(),
-      date: expenseDraft.date || todayValue(),
+      date: expenseDraft.date || `${selectedMonth}-01`,
     }
 
     setData((current) => ({
@@ -324,7 +397,7 @@ function App() {
       ...current,
       amount: '',
       memo: '',
-      date: todayValue(),
+      date: `${selectedMonth}-01`,
     }))
   }
 
@@ -339,6 +412,7 @@ function App() {
       amount,
       dueDay: Math.min(Math.max(Number(fixedDraft.dueDay) || 1, 1), 31),
       method: fixedDraft.method,
+      loanId: fixedDraft.loanId || undefined,
       active: true,
     }
 
@@ -351,6 +425,7 @@ function App() {
       amount: '',
       dueDay: '1',
       method: paymentMethods[0],
+      loanId: '',
     })
   }
 
@@ -365,6 +440,7 @@ function App() {
       name: loanDraft.name.trim(),
       balance,
       monthlyPayment: monthlyPayment > 0 ? monthlyPayment : 0,
+      extraPayment: Number(loanDraft.extraPayment) || 0,
       apr: Number(loanDraft.apr) || 0,
       kind: loanDraft.kind,
     }
@@ -377,9 +453,28 @@ function App() {
       name: '',
       balance: '',
       monthlyPayment: '',
+      extraPayment: '',
       apr: '',
-      kind: 'ショッピング',
+      kind: loanKinds[0],
     })
+  }
+
+  function updateLoanExtraPayment(id: string, extraPayment: number) {
+    setData((current) => ({
+      ...current,
+      loans: current.loans.map((loan) =>
+        loan.id === id ? { ...loan, extraPayment: Math.max(0, extraPayment) } : loan,
+      ),
+    }))
+  }
+
+  function updateFixedCostLoan(id: string, loanId: string) {
+    setData((current) => ({
+      ...current,
+      fixedCosts: current.fixedCosts.map((cost) =>
+        cost.id === id ? { ...cost, loanId: loanId || undefined } : cost,
+      ),
+    }))
   }
 
   function deleteExpense(id: string) {
@@ -399,6 +494,9 @@ function App() {
   function deleteLoan(id: string) {
     setData((current) => ({
       ...current,
+      fixedCosts: current.fixedCosts.map((cost) =>
+        cost.loanId === id ? { ...cost, loanId: undefined } : cost,
+      ),
       loans: current.loans.filter((loan) => loan.id !== id),
     }))
   }
@@ -426,7 +524,7 @@ function App() {
 
   function importData() {
     try {
-      const importedData = normalizeImportedData(JSON.parse(importText))
+      const importedData = normalizeData(JSON.parse(importText))
 
       setData(importedData)
       setImportText('')
@@ -456,12 +554,41 @@ function App() {
       </header>
 
       <main>
+        <section className="month-control" aria-label="表示月">
+          <button
+            className="icon-button"
+            type="button"
+            onClick={() => changeSelectedMonth(addMonths(selectedMonth, -1))}
+            aria-label="前の月"
+            title="前の月"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <label>
+            <span>表示月</span>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(event) => changeSelectedMonth(event.target.value)}
+            />
+          </label>
+          <button
+            className="icon-button"
+            type="button"
+            onClick={() => changeSelectedMonth(addMonths(selectedMonth, 1))}
+            aria-label="次の月"
+            title="次の月"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </section>
+
         <section className="summary-grid" aria-label="月次サマリー">
           <article className="metric-card metric-card-primary">
             <div className="metric-icon">
               <Gauge size={20} />
             </div>
-            <span>今月残り</span>
+            <span>{monthLabel(selectedMonth)}残り</span>
             <strong className={totals.remaining < 0 ? 'danger-text' : ''}>
               {yen(totals.remaining)}
             </strong>
@@ -470,15 +597,15 @@ function App() {
             <div className="metric-icon">
               <ReceiptText size={20} />
             </div>
-            <span>今月支出</span>
+            <span>{monthLabel(selectedMonth)}支出</span>
             <strong>{yen(totals.variableSpent)}</strong>
           </article>
           <article className="metric-card">
             <div className="metric-icon">
               <Landmark size={20} />
             </div>
-            <span>ローン残高</span>
-            <strong>{yen(totals.debtTotal)}</strong>
+            <span>予測ローン残高</span>
+            <strong>{yen(totals.projectedDebtTotal)}</strong>
           </article>
         </section>
 
@@ -490,14 +617,14 @@ function App() {
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">Dashboard</p>
-                <h2>今月の見通し</h2>
+                <h2>{monthLabel(selectedMonth)}の見通し</h2>
               </div>
               <ShieldCheck size={22} />
             </div>
 
             <div className="settings-grid">
               <label>
-                <span>今月手取り</span>
+                <span>手取り</span>
                 <input
                   inputMode="numeric"
                   type="number"
@@ -534,8 +661,8 @@ function App() {
                 <strong>{yen(totals.loanPaymentTotal)}</strong>
               </div>
               <div>
-                <span>予備費ライン</span>
-                <strong>{yen(data.settings.bufferTarget)}</strong>
+                <span>追加返済合計</span>
+                <strong>{yen(totals.extraPaymentTotal)}</strong>
               </div>
               <div>
                 <span>支出込み合計</span>
@@ -549,8 +676,14 @@ function App() {
                 <strong>{nextLoanTarget?.name ?? '未登録'}</strong>
               </div>
               <div>
-                <span>平均金利</span>
-                <strong>{percentFormatter.format(totals.weightedApr)}%</strong>
+                <span>完済目安</span>
+                <strong>
+                  {totals.payoffMonths === null
+                    ? '要見直し'
+                    : totals.payoffMonths
+                      ? `${totals.payoffMonths}ヶ月`
+                      : '未登録'}
+                </strong>
               </div>
             </div>
           </section>
@@ -562,7 +695,7 @@ function App() {
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">Quick Add</p>
-                <h2>支出入力</h2>
+                <h2>{monthLabel(selectedMonth)}の支出入力</h2>
               </div>
               <WalletCards size={22} />
             </div>
@@ -657,7 +790,7 @@ function App() {
 
             <div className="list-block">
               <div className="list-heading">
-                <h3>最近の支出</h3>
+                <h3>{monthLabel(selectedMonth)}の支出</h3>
                 <span>{monthlyExpenses.length}件</span>
               </div>
               {recentExpenses.length === 0 ? (
@@ -769,6 +902,25 @@ function App() {
                       ))}
                     </select>
                   </label>
+                  <label>
+                    <span>関連ローン</span>
+                    <select
+                      value={fixedDraft.loanId}
+                      onChange={(event) =>
+                        setFixedDraft((current) => ({
+                          ...current,
+                          loanId: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">なし</option>
+                      {data.loans.map((loan) => (
+                        <option key={loan.id} value={loan.id}>
+                          {loan.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <button className="secondary-button" type="submit">
                     <CalendarClock size={17} />
                     追加
@@ -776,35 +928,64 @@ function App() {
                 </form>
 
                 <ul className="item-list plan-list">
-                  {data.fixedCosts.map((cost) => (
-                    <li key={cost.id}>
-                      <button
-                        className="check-button"
-                        type="button"
-                        onClick={() => toggleFixedCost(cost.id)}
-                        aria-label="固定費の有効状態を切り替え"
-                        title="有効状態を切り替え"
-                      >
-                        {cost.active ? <CheckCircle2 size={19} /> : <CircleDollarSign size={19} />}
-                      </button>
-                      <div className="item-main">
-                        <span>{cost.name}</span>
-                        <strong>{yen(cost.amount)}</strong>
-                        <small>
-                          毎月{cost.dueDay}日 / {cost.method}
-                        </small>
-                      </div>
-                      <button
-                        className="icon-button subtle"
-                        type="button"
-                        onClick={() => deleteFixedCost(cost.id)}
-                        aria-label="固定費を削除"
-                        title="固定費を削除"
-                      >
-                        <Trash2 size={17} />
-                      </button>
-                    </li>
-                  ))}
+                  {data.fixedCosts.map((cost) => {
+                    const relatedLoan = data.loans.find(
+                      (loan) => loan.id === cost.loanId,
+                    )
+
+                    return (
+                      <li key={cost.id} className="stacked-item">
+                        <div className="item-row">
+                          <button
+                            className="check-button"
+                            type="button"
+                            onClick={() => toggleFixedCost(cost.id)}
+                            aria-label="固定費の有効状態を切り替え"
+                            title="有効状態を切り替え"
+                          >
+                            {cost.active ? (
+                              <CheckCircle2 size={19} />
+                            ) : (
+                              <CircleDollarSign size={19} />
+                            )}
+                          </button>
+                          <div className="item-main">
+                            <span>{cost.name}</span>
+                            <strong>{yen(cost.amount)}</strong>
+                            <small>
+                              毎月{cost.dueDay}日 / {cost.method}
+                              {relatedLoan ? ` / ${relatedLoan.name}` : ''}
+                            </small>
+                          </div>
+                          <button
+                            className="icon-button subtle"
+                            type="button"
+                            onClick={() => deleteFixedCost(cost.id)}
+                            aria-label="固定費を削除"
+                            title="固定費を削除"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        </div>
+                        <label className="mini-field">
+                          <span>関連ローン</span>
+                          <select
+                            value={cost.loanId ?? ''}
+                            onChange={(event) =>
+                              updateFixedCostLoan(cost.id, event.target.value)
+                            }
+                          >
+                            <option value="">なし</option>
+                            {data.loans.map((loan) => (
+                              <option key={loan.id} value={loan.id}>
+                                {loan.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
 
@@ -860,6 +1041,22 @@ function App() {
                   </div>
                   <div className="inline-fields">
                     <label>
+                      <span>追加返済</span>
+                      <input
+                        inputMode="numeric"
+                        type="number"
+                        min="0"
+                        value={loanDraft.extraPayment}
+                        onChange={(event) =>
+                          setLoanDraft((current) => ({
+                            ...current,
+                            extraPayment: event.target.value,
+                          }))
+                        }
+                        placeholder="0"
+                      />
+                    </label>
+                    <label>
                       <span>年率</span>
                       <input
                         inputMode="decimal"
@@ -876,24 +1073,23 @@ function App() {
                         placeholder="18"
                       />
                     </label>
-                    <label>
-                      <span>種別</span>
-                      <select
-                        value={loanDraft.kind}
-                        onChange={(event) =>
-                          setLoanDraft((current) => ({
-                            ...current,
-                            kind: event.target.value,
-                          }))
-                        }
-                      >
-                        <option>ショッピング</option>
-                        <option>キャッシング</option>
-                        <option>カードローン</option>
-                        <option>奨学金</option>
-                      </select>
-                    </label>
                   </div>
+                  <label>
+                    <span>種別</span>
+                    <select
+                      value={loanDraft.kind}
+                      onChange={(event) =>
+                        setLoanDraft((current) => ({
+                          ...current,
+                          kind: event.target.value,
+                        }))
+                      }
+                    >
+                      {loanKinds.map((kind) => (
+                        <option key={kind}>{kind}</option>
+                      ))}
+                    </select>
+                  </label>
                   <button className="secondary-button" type="submit">
                     <CreditCard size={17} />
                     追加
@@ -902,20 +1098,13 @@ function App() {
 
                 <div className="simulator">
                   <div>
-                    <span>追加返済</span>
-                    <strong>{yen(data.settings.extraPayment)}</strong>
+                    <span>通常返済</span>
+                    <strong>{yen(totals.baseLoanPaymentTotal)}</strong>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100000"
-                    step="5000"
-                    value={data.settings.extraPayment}
-                    onChange={(event) =>
-                      updateSettings({ extraPayment: Number(event.target.value) })
-                    }
-                    aria-label="追加返済額"
-                  />
+                  <div>
+                    <span>追加返済</span>
+                    <strong>{yen(totals.extraPaymentTotal)}</strong>
+                  </div>
                   <p>
                     {totals.payoffMonths === null
                       ? '月返済が利息を下回っています'
@@ -926,27 +1115,61 @@ function App() {
                 </div>
 
                 <ul className="item-list plan-list">
-                  {data.loans.map((loan) => (
-                    <li key={loan.id}>
-                      <div className="item-main">
-                        <span>{loan.name}</span>
-                        <strong>{yen(loan.balance)}</strong>
-                        <small>
-                          {loan.kind} / 月{yen(loan.monthlyPayment)} / 年率
-                          {percentFormatter.format(loan.apr)}%
-                        </small>
-                      </div>
-                      <button
-                        className="icon-button subtle"
-                        type="button"
-                        onClick={() => deleteLoan(loan.id)}
-                        aria-label="ローンを削除"
-                        title="ローンを削除"
-                      >
-                        <Trash2 size={17} />
-                      </button>
-                    </li>
-                  ))}
+                  {data.loans.map((loan) => {
+                    const linkedFixedTotal = loanFixedTotals[loan.id] ?? 0
+                    const projectedBalance = projectBalance(loan, forecastMonths)
+
+                    return (
+                      <li key={loan.id} className="stacked-item">
+                        <div className="item-row">
+                          <div className="item-main">
+                            <span>{loan.name}</span>
+                            <strong>{yen(projectedBalance)}</strong>
+                            <small>
+                              {loan.kind} / 通常{yen(loan.monthlyPayment)} / 追加
+                              {yen(loan.extraPayment)} / 年率
+                              {percentFormatter.format(loan.apr)}%
+                            </small>
+                            {linkedFixedTotal > 0 ? (
+                              <small>
+                                関連固定費 {yen(linkedFixedTotal)} / 月負担合計
+                                {yen(
+                                  loan.monthlyPayment +
+                                    loan.extraPayment +
+                                    linkedFixedTotal,
+                                )}
+                              </small>
+                            ) : null}
+                          </div>
+                          <button
+                            className="icon-button subtle"
+                            type="button"
+                            onClick={() => deleteLoan(loan.id)}
+                            aria-label="ローンを削除"
+                            title="ローンを削除"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        </div>
+                        <label className="mini-field">
+                          <span>このローンへの追加返済</span>
+                          <input
+                            inputMode="numeric"
+                            type="number"
+                            min="0"
+                            value={loan.extraPayment || ''}
+                            onChange={(event) =>
+                              updateLoanExtraPayment(
+                                loan.id,
+                                Number(event.target.value),
+                              )
+                            }
+                            placeholder="0"
+                          />
+                        </label>
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             </div>

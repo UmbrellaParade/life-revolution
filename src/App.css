@@ -33,6 +33,22 @@ main {
   max-width: 1180px;
 }
 
+.month-control {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 42px minmax(180px, 260px) 42px;
+  margin: 0 0 12px;
+}
+
+.month-control label {
+  margin: 0;
+}
+
+.month-control input {
+  height: 42px;
+}
+
 .summary-grid {
   display: grid;
   gap: 10px;
@@ -328,6 +344,18 @@ button {
   padding: 10px;
 }
 
+.stacked-item {
+  align-items: stretch !important;
+  flex-direction: column;
+}
+
+.item-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
 .item-main {
   display: grid;
   flex: 1;
@@ -358,12 +386,30 @@ button {
   background: #e9f5ec;
   border-radius: 8px;
   color: var(--green);
+  flex: 0 0 38px;
   height: 38px;
   width: 38px;
 }
 
+.mini-field {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.mini-field span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mini-field input,
+.mini-field select {
+  min-height: 38px;
+}
+
 .simulator {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 12px;
 }
 
@@ -373,6 +419,7 @@ button {
 }
 
 .simulator p {
+  grid-column: 1 / -1;
   margin: 0;
 }
 
@@ -484,8 +531,13 @@ button {
   .settings-grid,
   .inline-fields,
   .breakdown,
-  .focus-strip {
+  .focus-strip,
+  .simulator {
     grid-template-columns: 1fr;
+  }
+
+  .month-control {
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
   }
 
   .segmented {
