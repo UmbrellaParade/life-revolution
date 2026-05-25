@@ -842,7 +842,7 @@ function App() {
       <header className="app-header">
         <div>
           <p className="eyebrow">Saving</p>
-          <h1>Yutori Ledger</h1>
+          <h1>Umbrella Parade Life Revolution</h1>
         </div>
         <button
           className="icon-button"
@@ -1888,7 +1888,7 @@ function App() {
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">Strategy</p>
-                <h2>貯金・返済の戦略メモ</h2>
+                <h2>経済革命・戦略メモ</h2>
               </div>
               <button
                 className="strategy-add-toggle"
