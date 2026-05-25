@@ -434,6 +434,12 @@ button {
   margin: 0;
 }
 
+.csv-buttons {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .import-panel {
   background: var(--soft);
   border: 1px solid var(--line);
@@ -554,5 +560,9 @@ button {
 
   .segmented {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .csv-buttons {
+    grid-template-columns: 1fr;
   }
 }

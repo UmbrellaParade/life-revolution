@@ -675,6 +675,62 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
+  function downloadCsv(filename: string, rows: (string | number)[][]) {
+    const escape = (v: string | number) => {
+      const s = String(v)
+      return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"`
+        : s
+    }
+    const csv = rows.map((row) => row.map(escape).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function exportExpensesCsv() {
+    const rows: (string | number)[][] = [
+      ['日付', '金額', 'カテゴリ', '支払い方法', 'メモ'],
+      ...[...data.expenses]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((e) => [e.date, e.amount, e.category, e.method, e.memo]),
+    ]
+    downloadCsv(`支出一覧-${todayValue()}.csv`, rows)
+  }
+
+  function exportFixedCostsCsv() {
+    const rows: (string | number)[][] = [
+      ['名前', '金額', '支払日', '支払い方法', '関連ローン', '有効'],
+      ...data.fixedCosts.map((c) => {
+        const loan = data.loans.find((l) => l.id === c.loanId)
+        return [c.name, c.amount, c.dueDay, c.method, loan?.name ?? '', c.active ? '有効' : '停止']
+      }),
+    ]
+    downloadCsv(`固定費一覧-${todayValue()}.csv`, rows)
+  }
+
+  function exportLoansCsv() {
+    const rows: (string | number)[][] = [
+      ['名前', '残高', '手数料', '月返済', '追加返済', '年率(%)', '種別', '総返済回数', '返済済回数'],
+      ...data.loans.map((l) => [
+        l.name,
+        l.balance,
+        l.fee,
+        l.monthlyPayment,
+        l.extraPayment,
+        l.apr,
+        l.kind,
+        l.totalPayments || '',
+        l.paymentHistory.length,
+      ]),
+    ]
+    downloadCsv(`ローン一覧-${todayValue()}.csv`, rows)
+  }
+
   function importData() {
     try {
       const importedData = normalizeData(JSON.parse(importText))
@@ -1657,6 +1713,27 @@ function App() {
                     )
                   })}
                 </ul>
+              </div>
+            </div>
+
+            <div className="import-panel">
+              <div>
+                <h3>CSVエクスポート</h3>
+                <p>Excel・Google Sheetsで開けるCSVファイルを出力します。</p>
+              </div>
+              <div className="csv-buttons">
+                <button className="secondary-button" type="button" onClick={exportExpensesCsv}>
+                  <Download size={17} />
+                  支出CSV
+                </button>
+                <button className="secondary-button" type="button" onClick={exportFixedCostsCsv}>
+                  <Download size={17} />
+                  固定費CSV
+                </button>
+                <button className="secondary-button" type="button" onClick={exportLoansCsv}>
+                  <Download size={17} />
+                  ローンCSV
+                </button>
               </div>
             </div>
 
