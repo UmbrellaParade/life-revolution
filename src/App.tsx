@@ -1,6 +1,7 @@
 import {
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
@@ -298,6 +299,26 @@ function App() {
   })
   const [importText, setImportText] = useState('')
   const [importMessage, setImportMessage] = useState('')
+  const [expandedLoanIds, setExpandedLoanIds] = useState<Set<string>>(new Set())
+  const [expandedFixedIds, setExpandedFixedIds] = useState<Set<string>>(new Set())
+
+  function toggleLoanExpanded(id: string) {
+    setExpandedLoanIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleFixedExpanded(id: string) {
+    setExpandedFixedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(data))
@@ -1132,6 +1153,8 @@ function App() {
                       (loan) => loan.id === cost.loanId,
                     )
 
+                    const isFixedExpanded = expandedFixedIds.has(cost.id)
+
                     return (
                       <li key={cost.id} className="stacked-item">
                         <div className="item-row">
@@ -1159,6 +1182,21 @@ function App() {
                           <button
                             className="icon-button subtle"
                             type="button"
+                            onClick={() => toggleFixedExpanded(cost.id)}
+                            aria-label={isFixedExpanded ? '折りたたむ' : '編集する'}
+                            title={isFixedExpanded ? '折りたたむ' : '編集する'}
+                          >
+                            <ChevronDown
+                              size={17}
+                              style={{
+                                transform: isFixedExpanded ? 'rotate(180deg)' : 'none',
+                                transition: 'transform 0.2s',
+                              }}
+                            />
+                          </button>
+                          <button
+                            className="icon-button subtle"
+                            type="button"
                             onClick={() => deleteFixedCost(cost.id)}
                             aria-label="固定費を削除"
                             title="固定費を削除"
@@ -1166,7 +1204,7 @@ function App() {
                             <Trash2 size={17} />
                           </button>
                         </div>
-                        <div className="edit-grid">
+                        {isFixedExpanded && <div className="edit-grid">
                           <label className="mini-field">
                             <span>名前</span>
                             <input
@@ -1238,7 +1276,7 @@ function App() {
                               ))}
                             </select>
                           </label>
-                        </div>
+                        </div>}
                       </li>
                     )
                   })}
@@ -1410,6 +1448,7 @@ function App() {
                       (p) => p.month === selectedMonth,
                     )
                     const paidCount = loan.paymentHistory.length
+                    const isLoanExpanded = expandedLoanIds.has(loan.id)
 
                     return (
                       <li key={loan.id} className="stacked-item">
@@ -1466,6 +1505,21 @@ function App() {
                           <button
                             className="icon-button subtle"
                             type="button"
+                            onClick={() => toggleLoanExpanded(loan.id)}
+                            aria-label={isLoanExpanded ? '折りたたむ' : '編集する'}
+                            title={isLoanExpanded ? '折りたたむ' : '編集する'}
+                          >
+                            <ChevronDown
+                              size={17}
+                              style={{
+                                transform: isLoanExpanded ? 'rotate(180deg)' : 'none',
+                                transition: 'transform 0.2s',
+                              }}
+                            />
+                          </button>
+                          <button
+                            className="icon-button subtle"
+                            type="button"
                             onClick={() => deleteLoan(loan.id)}
                             aria-label="ローンを削除"
                             title="ローンを削除"
@@ -1473,7 +1527,7 @@ function App() {
                             <Trash2 size={17} />
                           </button>
                         </div>
-                        <div className="edit-grid">
+                        {isLoanExpanded && <div className="edit-grid">
                           <label className="mini-field">
                             <span>名前</span>
                             <input
@@ -1582,7 +1636,7 @@ function App() {
                               ))}
                             </select>
                           </label>
-                        </div>
+                        </div>}
                       </li>
                     )
                   })}
