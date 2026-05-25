@@ -790,29 +790,22 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
-  function exportExpensesCsv() {
+  function exportCsv() {
     const rows: (string | number)[][] = [
+      ['■ 支出一覧'],
       ['日付', '金額', 'カテゴリ', '支払い方法', 'メモ'],
       ...[...data.expenses]
         .sort((a, b) => a.date.localeCompare(b.date))
         .map((e) => [e.date, e.amount, e.category, e.method, e.memo]),
-    ]
-    downloadCsv(`支出一覧-${todayValue()}.csv`, rows)
-  }
-
-  function exportFixedCostsCsv() {
-    const rows: (string | number)[][] = [
+      [],
+      ['■ 固定費一覧'],
       ['名前', '金額', '支払日', '支払い方法', '関連ローン', '有効'],
       ...data.fixedCosts.map((c) => {
         const loan = data.loans.find((l) => l.id === c.loanId)
         return [c.name, c.amount, c.dueDay, c.method, loan?.name ?? '', c.active ? '有効' : '停止']
       }),
-    ]
-    downloadCsv(`固定費一覧-${todayValue()}.csv`, rows)
-  }
-
-  function exportLoansCsv() {
-    const rows: (string | number)[][] = [
+      [],
+      ['■ ローン一覧'],
       ['名前', '残高', '手数料', '月返済', '追加返済', '年率(%)', '種別', '総返済回数', '返済済回数'],
       ...data.loans.map((l) => [
         l.name,
@@ -826,13 +819,7 @@ function App() {
         l.paymentHistory.length,
       ]),
     ]
-    downloadCsv(`ローン一覧-${todayValue()}.csv`, rows)
-  }
-
-  function exportAllCsv() {
-    exportExpensesCsv()
-    setTimeout(() => exportFixedCostsCsv(), 300)
-    setTimeout(() => exportLoansCsv(), 600)
+    downloadCsv(`yutori-ledger-${todayValue()}.csv`, rows)
   }
 
   function importData() {
@@ -1853,26 +1840,12 @@ function App() {
             <div className="import-panel">
               <div>
                 <h3>CSVエクスポート</h3>
-                <p>Excel・Google Sheetsで開けるCSVファイルを出力します。</p>
+                <p>支出・固定費・ローンをまとめて1ファイルで出力します。</p>
               </div>
-              <button className="primary-button" type="button" onClick={exportAllCsv}>
+              <button className="primary-button" type="button" onClick={exportCsv}>
                 <Download size={17} />
-                全データCSV一括出力
+                CSVで保存する
               </button>
-              <div className="csv-buttons">
-                <button className="secondary-button" type="button" onClick={exportExpensesCsv}>
-                  <Download size={17} />
-                  支出のみ
-                </button>
-                <button className="secondary-button" type="button" onClick={exportFixedCostsCsv}>
-                  <Download size={17} />
-                  固定費のみ
-                </button>
-                <button className="secondary-button" type="button" onClick={exportLoansCsv}>
-                  <Download size={17} />
-                  ローンのみ
-                </button>
-              </div>
             </div>
 
             <div className="import-panel">
