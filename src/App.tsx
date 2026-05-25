@@ -1938,8 +1938,9 @@ function App() {
               <div className="strategy-board">
                 {data.strategyNotes.map((note) => (
                   <div key={note.id} className="strategy-card">
-                    <input
+                    <textarea
                       className="strategy-card-title"
+                      rows={2}
                       value={note.title}
                       onChange={(event) =>
                         updateStrategyNote(note.id, { title: event.target.value })

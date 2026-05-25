@@ -528,7 +528,11 @@ button {
   font-size: 15px;
   font-weight: 800;
   min-height: unset;
+  overflow: hidden;
   padding: 0 0 8px;
+  resize: none;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .strategy-card-title:focus {
@@ -545,9 +549,11 @@ button {
   font-size: 14px;
   line-height: 1.7;
   min-height: 120px;
+  overflow-wrap: break-word;
   padding: 0;
   resize: vertical;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .strategy-card-body:focus {
