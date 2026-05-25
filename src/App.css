@@ -434,6 +434,26 @@ button {
   margin: 0;
 }
 
+.strategy-preview {
+  color: var(--muted);
+  display: -webkit-box;
+  font-size: 12px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+.strategy-edit {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.strategy-edit textarea {
+  min-height: 120px;
+}
+
 .csv-buttons {
   display: grid;
   gap: 8px;
