@@ -1,5 +1,11 @@
 const cacheName = 'yutori-ledger-v1'
-const appShell = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg']
+const baseUrl = self.registration.scope
+const appShell = [
+  baseUrl,
+  `${baseUrl}index.html`,
+  `${baseUrl}manifest.webmanifest`,
+  `${baseUrl}favicon.svg`,
+]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -36,7 +42,7 @@ self.addEventListener('fetch', (event) => {
             })
             return response
           })
-          .catch(() => caches.match('/index.html'))
+          .catch(() => caches.match(`${baseUrl}index.html`))
       )
     }),
   )
