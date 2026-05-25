@@ -840,22 +840,11 @@ function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div>
-          <img
-            src={`${import.meta.env.BASE_URL}header-v3.png`}
-            alt="Umbrella Parade Life Revolution"
-            className="app-header-img"
-          />
-        </div>
-        <button
-          className="icon-button"
-          type="button"
-          onClick={exportData}
-          aria-label="データを出力"
-          title="データを出力"
-        >
-          <Download size={18} />
-        </button>
+        <img
+          src={`${import.meta.env.BASE_URL}header-v3.png`}
+          alt="Umbrella Parade Life Revolution"
+          className="app-header-img"
+        />
       </header>
 
       <main data-tab={activeTab}>
