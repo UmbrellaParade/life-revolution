@@ -44,6 +44,7 @@ type Loan = {
   id: string
   name: string
   balance: number
+  fee: number
   monthlyPayment: number
   extraPayment: number
   apr: number
@@ -150,6 +151,18 @@ function yen(value: number) {
   return currencyFormatter.format(Math.round(value || 0))
 }
 
+function clampPositive(value: number) {
+  return Math.max(0, Number(value) || 0)
+}
+
+function clampDueDay(value: number) {
+  return Math.min(Math.max(Number(value) || 1, 1), 31)
+}
+
+function loanPayable(loan: Loan) {
+  return loan.balance + loan.fee
+}
+
 function inferLoanId(cost: Partial<FixedCost>, loans: Loan[]) {
   if (cost.loanId && loans.some((loan) => loan.id === cost.loanId)) {
     return cost.loanId
@@ -165,12 +178,13 @@ function normalizeData(importedData: Partial<AppData>): AppData {
       id: loan.id || createId(),
       name: loan.name || '',
       balance: Number(loan.balance) || 0,
+      fee: Number(loan.fee) || 0,
       monthlyPayment: Number(loan.monthlyPayment) || 0,
       extraPayment: Number(loan.extraPayment) || 0,
       apr: Number(loan.apr) || 0,
       kind: loan.kind || 'ローン',
     }))
-    .filter((loan) => loan.name && loan.balance > 0)
+    .filter((loan) => loan.name && loanPayable(loan) > 0)
 
   const expenses = (importedData.expenses ?? [])
     .map((expense) => ({
@@ -188,7 +202,7 @@ function normalizeData(importedData: Partial<AppData>): AppData {
       id: cost.id || createId(),
       name: cost.name || '',
       amount: Number(cost.amount) || 0,
-      dueDay: Math.min(Math.max(Number(cost.dueDay) || 1, 1), 31),
+      dueDay: clampDueDay(cost.dueDay),
       method: cost.method || paymentMethods[0],
       loanId: inferLoanId(cost, loans),
       active: cost.active ?? true,
@@ -231,7 +245,7 @@ function estimateMonths(principal: number, monthlyPayment: number, apr: number) 
 }
 
 function projectBalance(loan: Loan, months: number) {
-  let balance = loan.balance
+  let balance = loanPayable(loan)
   const monthlyRate = loan.apr > 0 ? loan.apr / 100 / 12 : 0
   const payment = loan.monthlyPayment + loan.extraPayment
 
@@ -265,6 +279,7 @@ function App() {
   const [loanDraft, setLoanDraft] = useState({
     name: '',
     balance: '',
+    fee: '',
     monthlyPayment: '',
     extraPayment: '',
     apr: '',
@@ -311,14 +326,14 @@ function App() {
       0,
     )
     const loanPaymentTotal = baseLoanPaymentTotal + extraPaymentTotal
-    const debtTotal = data.loans.reduce((sum, loan) => sum + loan.balance, 0)
+    const debtTotal = data.loans.reduce((sum, loan) => sum + loanPayable(loan), 0)
     const projectedDebtTotal = data.loans.reduce(
       (sum, loan) => sum + projectBalance(loan, forecastMonths),
       0,
     )
     const weightedApr =
       debtTotal > 0
-        ? data.loans.reduce((sum, loan) => sum + loan.balance * loan.apr, 0) /
+        ? data.loans.reduce((sum, loan) => sum + loanPayable(loan) * loan.apr, 0) /
           debtTotal
         : 0
     const plannedOutflow =
@@ -349,7 +364,9 @@ function App() {
   }, [data.fixedCosts, data.loans, data.settings, forecastMonths, monthlyExpenses])
 
   const nextLoanTarget = useMemo(() => {
-    return [...data.loans].sort((a, b) => b.apr - a.apr || b.balance - a.balance)[0]
+    return [...data.loans].sort(
+      (a, b) => b.apr - a.apr || loanPayable(b) - loanPayable(a),
+    )[0]
   }, [data.loans])
 
   const recentExpenses = [...monthlyExpenses]
@@ -410,7 +427,7 @@ function App() {
       id: createId(),
       name: fixedDraft.name.trim(),
       amount,
-      dueDay: Math.min(Math.max(Number(fixedDraft.dueDay) || 1, 1), 31),
+      dueDay: clampDueDay(Number(fixedDraft.dueDay)),
       method: fixedDraft.method,
       loanId: fixedDraft.loanId || undefined,
       active: true,
@@ -432,13 +449,15 @@ function App() {
   function addLoan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const balance = Number(loanDraft.balance)
+    const fee = Number(loanDraft.fee) || 0
     const monthlyPayment = Number(loanDraft.monthlyPayment)
-    if (!loanDraft.name.trim() || !balance || balance <= 0) return
+    if (!loanDraft.name.trim() || balance + fee <= 0) return
 
     const loan: Loan = {
       id: createId(),
       name: loanDraft.name.trim(),
-      balance,
+      balance: Math.max(0, balance || 0),
+      fee: Math.max(0, fee),
       monthlyPayment: monthlyPayment > 0 ? monthlyPayment : 0,
       extraPayment: Number(loanDraft.extraPayment) || 0,
       apr: Number(loanDraft.apr) || 0,
@@ -452,6 +471,7 @@ function App() {
     setLoanDraft({
       name: '',
       balance: '',
+      fee: '',
       monthlyPayment: '',
       extraPayment: '',
       apr: '',
@@ -459,22 +479,74 @@ function App() {
     })
   }
 
-  function updateLoanExtraPayment(id: string, extraPayment: number) {
+  function updateExpense(id: string, patch: Partial<Expense>) {
+    setData((current) => ({
+      ...current,
+      expenses: current.expenses.map((expense) =>
+        expense.id === id
+          ? {
+              ...expense,
+              ...patch,
+              amount:
+                patch.amount === undefined
+                  ? expense.amount
+                  : clampPositive(patch.amount),
+            }
+          : expense,
+      ),
+    }))
+  }
+
+  function updateFixedCost(id: string, patch: Partial<FixedCost>) {
+    setData((current) => ({
+      ...current,
+      fixedCosts: current.fixedCosts.map((cost) =>
+        cost.id === id
+          ? {
+              ...cost,
+              ...patch,
+              amount:
+                patch.amount === undefined ? cost.amount : clampPositive(patch.amount),
+              dueDay:
+                patch.dueDay === undefined ? cost.dueDay : clampDueDay(patch.dueDay),
+              loanId:
+                patch.loanId === undefined
+                  ? cost.loanId
+                  : patch.loanId || undefined,
+            }
+          : cost,
+      ),
+    }))
+  }
+
+  function updateLoan(id: string, patch: Partial<Loan>) {
     setData((current) => ({
       ...current,
       loans: current.loans.map((loan) =>
-        loan.id === id ? { ...loan, extraPayment: Math.max(0, extraPayment) } : loan,
+        loan.id === id
+          ? {
+              ...loan,
+              ...patch,
+              balance:
+                patch.balance === undefined ? loan.balance : clampPositive(patch.balance),
+              fee: patch.fee === undefined ? loan.fee : clampPositive(patch.fee),
+              monthlyPayment:
+                patch.monthlyPayment === undefined
+                  ? loan.monthlyPayment
+                  : clampPositive(patch.monthlyPayment),
+              extraPayment:
+                patch.extraPayment === undefined
+                  ? loan.extraPayment
+                  : clampPositive(patch.extraPayment),
+              apr: patch.apr === undefined ? loan.apr : clampPositive(patch.apr),
+            }
+          : loan,
       ),
     }))
   }
 
   function updateFixedCostLoan(id: string, loanId: string) {
-    setData((current) => ({
-      ...current,
-      fixedCosts: current.fixedCosts.map((cost) =>
-        cost.id === id ? { ...cost, loanId: loanId || undefined } : cost,
-      ),
-    }))
+    updateFixedCost(id, { loanId })
   }
 
   function deleteExpense(id: string) {
@@ -604,7 +676,7 @@ function App() {
             <div className="metric-icon">
               <Landmark size={20} />
             </div>
-            <span>予測ローン残高</span>
+            <span>予測ローン総額</span>
             <strong>{yen(totals.projectedDebtTotal)}</strong>
           </article>
         </section>
@@ -798,24 +870,91 @@ function App() {
               ) : (
                 <ul className="item-list">
                   {recentExpenses.map((expense) => (
-                    <li key={expense.id}>
-                      <div className="item-main">
-                        <span>{expense.category}</span>
-                        <strong>{yen(expense.amount)}</strong>
-                        <small>
-                          {expense.date} / {expense.method}
-                          {expense.memo ? ` / ${expense.memo}` : ''}
-                        </small>
+                    <li key={expense.id} className="stacked-item">
+                      <div className="item-row">
+                        <div className="item-main">
+                          <span>{expense.category}</span>
+                          <strong>{yen(expense.amount)}</strong>
+                          <small>
+                            {expense.date} / {expense.method}
+                            {expense.memo ? ` / ${expense.memo}` : ''}
+                          </small>
+                        </div>
+                        <button
+                          className="icon-button subtle"
+                          type="button"
+                          onClick={() => deleteExpense(expense.id)}
+                          aria-label="支出を削除"
+                          title="支出を削除"
+                        >
+                          <Trash2 size={17} />
+                        </button>
                       </div>
-                      <button
-                        className="icon-button subtle"
-                        type="button"
-                        onClick={() => deleteExpense(expense.id)}
-                        aria-label="支出を削除"
-                        title="支出を削除"
-                      >
-                        <Trash2 size={17} />
-                      </button>
+                      <div className="edit-grid">
+                        <label className="mini-field">
+                          <span>金額</span>
+                          <input
+                            inputMode="numeric"
+                            type="number"
+                            min="0"
+                            value={expense.amount || ''}
+                            onChange={(event) =>
+                              updateExpense(expense.id, {
+                                amount: Number(event.target.value),
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="mini-field">
+                          <span>カテゴリ</span>
+                          <select
+                            value={expense.category}
+                            onChange={(event) =>
+                              updateExpense(expense.id, {
+                                category: event.target.value,
+                              })
+                            }
+                          >
+                            {categories.map((category) => (
+                              <option key={category}>{category}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="mini-field">
+                          <span>日付</span>
+                          <input
+                            type="date"
+                            value={expense.date}
+                            onChange={(event) =>
+                              updateExpense(expense.id, { date: event.target.value })
+                            }
+                          />
+                        </label>
+                        <label className="mini-field">
+                          <span>支払い方法</span>
+                          <select
+                            value={expense.method}
+                            onChange={(event) =>
+                              updateExpense(expense.id, {
+                                method: event.target.value,
+                              })
+                            }
+                          >
+                            {paymentMethods.map((method) => (
+                              <option key={method}>{method}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="mini-field full-span">
+                          <span>メモ</span>
+                          <input
+                            value={expense.memo}
+                            onChange={(event) =>
+                              updateExpense(expense.id, { memo: event.target.value })
+                            }
+                          />
+                        </label>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -967,22 +1106,79 @@ function App() {
                             <Trash2 size={17} />
                           </button>
                         </div>
-                        <label className="mini-field">
-                          <span>関連ローン</span>
-                          <select
-                            value={cost.loanId ?? ''}
-                            onChange={(event) =>
-                              updateFixedCostLoan(cost.id, event.target.value)
-                            }
-                          >
-                            <option value="">なし</option>
-                            {data.loans.map((loan) => (
-                              <option key={loan.id} value={loan.id}>
-                                {loan.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                        <div className="edit-grid">
+                          <label className="mini-field">
+                            <span>名前</span>
+                            <input
+                              value={cost.name}
+                              onChange={(event) =>
+                                updateFixedCost(cost.id, {
+                                  name: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="mini-field">
+                            <span>金額</span>
+                            <input
+                              inputMode="numeric"
+                              type="number"
+                              min="0"
+                              value={cost.amount || ''}
+                              onChange={(event) =>
+                                updateFixedCost(cost.id, {
+                                  amount: Number(event.target.value),
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="mini-field">
+                            <span>支払日</span>
+                            <input
+                              inputMode="numeric"
+                              type="number"
+                              min="1"
+                              max="31"
+                              value={cost.dueDay}
+                              onChange={(event) =>
+                                updateFixedCost(cost.id, {
+                                  dueDay: Number(event.target.value),
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="mini-field">
+                            <span>支払い方法</span>
+                            <select
+                              value={cost.method}
+                              onChange={(event) =>
+                                updateFixedCost(cost.id, {
+                                  method: event.target.value,
+                                })
+                              }
+                            >
+                              {paymentMethods.map((method) => (
+                                <option key={method}>{method}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="mini-field full-span">
+                            <span>関連ローン</span>
+                            <select
+                              value={cost.loanId ?? ''}
+                              onChange={(event) =>
+                                updateFixedCostLoan(cost.id, event.target.value)
+                              }
+                            >
+                              <option value="">なし</option>
+                              {data.loans.map((loan) => (
+                                <option key={loan.id} value={loan.id}>
+                                  {loan.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
                       </li>
                     )
                   })}
@@ -1023,6 +1219,24 @@ function App() {
                       />
                     </label>
                     <label>
+                      <span>手数料</span>
+                      <input
+                        inputMode="numeric"
+                        type="number"
+                        min="0"
+                        value={loanDraft.fee}
+                        onChange={(event) =>
+                          setLoanDraft((current) => ({
+                            ...current,
+                            fee: event.target.value,
+                          }))
+                        }
+                        placeholder="0"
+                      />
+                    </label>
+                  </div>
+                  <div className="inline-fields">
+                    <label>
                       <span>月返済</span>
                       <input
                         inputMode="numeric"
@@ -1038,8 +1252,6 @@ function App() {
                         placeholder="17000"
                       />
                     </label>
-                  </div>
-                  <div className="inline-fields">
                     <label>
                       <span>追加返済</span>
                       <input
@@ -1126,7 +1338,11 @@ function App() {
                             <span>{loan.name}</span>
                             <strong>{yen(projectedBalance)}</strong>
                             <small>
-                              {loan.kind} / 通常{yen(loan.monthlyPayment)} / 追加
+                              {loan.kind} / 残高{yen(loan.balance)} / 手数料
+                              {yen(loan.fee)}
+                            </small>
+                            <small>
+                              通常{yen(loan.monthlyPayment)} / 追加
                               {yen(loan.extraPayment)} / 年率
                               {percentFormatter.format(loan.apr)}%
                             </small>
@@ -1151,22 +1367,101 @@ function App() {
                             <Trash2 size={17} />
                           </button>
                         </div>
-                        <label className="mini-field">
-                          <span>このローンへの追加返済</span>
-                          <input
-                            inputMode="numeric"
-                            type="number"
-                            min="0"
-                            value={loan.extraPayment || ''}
-                            onChange={(event) =>
-                              updateLoanExtraPayment(
-                                loan.id,
-                                Number(event.target.value),
-                              )
-                            }
-                            placeholder="0"
-                          />
-                        </label>
+                        <div className="edit-grid">
+                          <label className="mini-field">
+                            <span>名前</span>
+                            <input
+                              value={loan.name}
+                              onChange={(event) =>
+                                updateLoan(loan.id, { name: event.target.value })
+                              }
+                            />
+                          </label>
+                          <label className="mini-field">
+                            <span>残高</span>
+                            <input
+                              inputMode="numeric"
+                              type="number"
+                              min="0"
+                              value={loan.balance || ''}
+                              onChange={(event) =>
+                                updateLoan(loan.id, {
+                                  balance: Number(event.target.value),
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="mini-field">
+                            <span>手数料</span>
+                            <input
+                              inputMode="numeric"
+                              type="number"
+                              min="0"
+                              value={loan.fee || ''}
+                              onChange={(event) =>
+                                updateLoan(loan.id, {
+                                  fee: Number(event.target.value),
+                                })
+                              }
+                              placeholder="0"
+                            />
+                          </label>
+                          <label className="mini-field">
+                            <span>月返済</span>
+                            <input
+                              inputMode="numeric"
+                              type="number"
+                              min="0"
+                              value={loan.monthlyPayment || ''}
+                              onChange={(event) =>
+                                updateLoan(loan.id, {
+                                  monthlyPayment: Number(event.target.value),
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="mini-field">
+                            <span>追加返済</span>
+                            <input
+                              inputMode="numeric"
+                              type="number"
+                              min="0"
+                              value={loan.extraPayment || ''}
+                              onChange={(event) =>
+                                updateLoan(loan.id, {
+                                  extraPayment: Number(event.target.value),
+                                })
+                              }
+                              placeholder="0"
+                            />
+                          </label>
+                          <label className="mini-field">
+                            <span>年率</span>
+                            <input
+                              inputMode="decimal"
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={loan.apr || ''}
+                              onChange={(event) =>
+                                updateLoan(loan.id, { apr: Number(event.target.value) })
+                              }
+                            />
+                          </label>
+                          <label className="mini-field full-span">
+                            <span>種別</span>
+                            <select
+                              value={loan.kind}
+                              onChange={(event) =>
+                                updateLoan(loan.id, { kind: event.target.value })
+                              }
+                            >
+                              {loanKinds.map((kind) => (
+                                <option key={kind}>{kind}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
                       </li>
                     )
                   })}
