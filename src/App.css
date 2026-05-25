@@ -19,13 +19,19 @@
   margin: 4px 0 0;
 }
 
+.app-header > div:first-child {
+  flex: 1;
+  min-width: 0;
+  margin-right: 12px;
+}
+
 .app-header-img {
   display: block;
   height: auto;
-  max-height: 64px;
-  max-width: 320px;
+  max-height: 72px;
   object-fit: contain;
-  width: auto;
+  object-position: left center;
+  width: 100%;
 }
 
 .eyebrow {
@@ -739,8 +745,7 @@ button {
   }
 
   .app-header-img {
-    max-height: 48px;
-    max-width: 240px;
+    max-height: 52px;
   }
 
   .settings-grid,
