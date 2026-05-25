@@ -40,6 +40,12 @@ type FixedCost = {
   active: boolean
 }
 
+type LoanPaymentRecord = {
+  month: string
+  balanceBefore: number
+  feeBefore: number
+}
+
 type Loan = {
   id: string
   name: string
@@ -49,6 +55,8 @@ type Loan = {
   extraPayment: number
   apr: number
   kind: string
+  totalPayments: number
+  paymentHistory: LoanPaymentRecord[]
 }
 
 type Settings = {
@@ -183,6 +191,8 @@ function normalizeData(importedData: Partial<AppData>): AppData {
       extraPayment: Number(loan.extraPayment) || 0,
       apr: Number(loan.apr) || 0,
       kind: loan.kind || 'ローン',
+      totalPayments: Number(loan.totalPayments) || 0,
+      paymentHistory: Array.isArray(loan.paymentHistory) ? loan.paymentHistory : [],
     }))
     .filter((loan) => loan.name && loanPayable(loan) > 0)
 
@@ -284,6 +294,7 @@ function App() {
     extraPayment: '',
     apr: '',
     kind: loanKinds[0],
+    totalPayments: '',
   })
   const [importText, setImportText] = useState('')
   const [importMessage, setImportMessage] = useState('')
@@ -462,6 +473,8 @@ function App() {
       extraPayment: Number(loanDraft.extraPayment) || 0,
       apr: Number(loanDraft.apr) || 0,
       kind: loanDraft.kind,
+      totalPayments: Number(loanDraft.totalPayments) || 0,
+      paymentHistory: [],
     }
 
     setData((current) => ({
@@ -476,6 +489,7 @@ function App() {
       extraPayment: '',
       apr: '',
       kind: loanKinds[0],
+      totalPayments: '',
     })
   }
 
@@ -539,9 +553,55 @@ function App() {
                   ? loan.extraPayment
                   : clampPositive(patch.extraPayment),
               apr: patch.apr === undefined ? loan.apr : clampPositive(patch.apr),
+              totalPayments:
+                patch.totalPayments === undefined
+                  ? loan.totalPayments
+                  : clampPositive(patch.totalPayments),
             }
           : loan,
       ),
+    }))
+  }
+
+  function applyLoanPayment(loanId: string) {
+    setData((current) => ({
+      ...current,
+      loans: current.loans.map((loan) => {
+        if (loan.id !== loanId) return loan
+        if (loan.paymentHistory.some((p) => p.month === selectedMonth)) return loan
+        const total = loanPayable(loan)
+        if (total <= 0) return loan
+        const monthlyRate = loan.apr > 0 ? loan.apr / 100 / 12 : 0
+        const totalWithInterest = total + total * monthlyRate
+        const payment = loan.monthlyPayment + loan.extraPayment
+        const newBalance = Math.max(0, totalWithInterest - payment)
+        return {
+          ...loan,
+          balance: newBalance,
+          fee: 0,
+          paymentHistory: [
+            ...loan.paymentHistory,
+            { month: selectedMonth, balanceBefore: loan.balance, feeBefore: loan.fee },
+          ],
+        }
+      }),
+    }))
+  }
+
+  function revertLoanPayment(loanId: string) {
+    setData((current) => ({
+      ...current,
+      loans: current.loans.map((loan) => {
+        if (loan.id !== loanId) return loan
+        const record = loan.paymentHistory.find((p) => p.month === selectedMonth)
+        if (!record) return loan
+        return {
+          ...loan,
+          balance: record.balanceBefore,
+          fee: record.feeBefore,
+          paymentHistory: loan.paymentHistory.filter((p) => p.month !== selectedMonth),
+        }
+      }),
     }))
   }
 
@@ -1269,6 +1329,22 @@ function App() {
                       />
                     </label>
                     <label>
+                      <span>返済回数（総回数）</span>
+                      <input
+                        inputMode="numeric"
+                        type="number"
+                        min="0"
+                        value={loanDraft.totalPayments}
+                        onChange={(event) =>
+                          setLoanDraft((current) => ({
+                            ...current,
+                            totalPayments: event.target.value,
+                          }))
+                        }
+                        placeholder="36"
+                      />
+                    </label>
+                    <label>
                       <span>年率</span>
                       <input
                         inputMode="decimal"
@@ -1330,21 +1406,51 @@ function App() {
                   {data.loans.map((loan) => {
                     const linkedFixedTotal = loanFixedTotals[loan.id] ?? 0
                     const projectedBalance = projectBalance(loan, forecastMonths)
+                    const isPaidThisMonth = loan.paymentHistory.some(
+                      (p) => p.month === selectedMonth,
+                    )
+                    const paidCount = loan.paymentHistory.length
 
                     return (
                       <li key={loan.id} className="stacked-item">
                         <div className="item-row">
+                          <button
+                            className="check-button"
+                            type="button"
+                            onClick={() =>
+                              isPaidThisMonth
+                                ? revertLoanPayment(loan.id)
+                                : applyLoanPayment(loan.id)
+                            }
+                            aria-label={
+                              isPaidThisMonth ? '返済済み（取り消し）' : '今月の返済を記録'
+                            }
+                            title={
+                              isPaidThisMonth ? '返済済み（クリックで取り消し）' : '今月の返済を記録する'
+                            }
+                          >
+                            {isPaidThisMonth ? (
+                              <CheckCircle2 size={19} />
+                            ) : (
+                              <CircleDollarSign size={19} />
+                            )}
+                          </button>
                           <div className="item-main">
                             <span>{loan.name}</span>
                             <strong>{yen(projectedBalance)}</strong>
                             <small>
-                              {loan.kind} / 残高{yen(loan.balance)} / 手数料
-                              {yen(loan.fee)}
+                              {loan.kind} / 残高{yen(loan.balance)}
+                              {loan.fee > 0 ? ` / 手数料${yen(loan.fee)}` : ''}
                             </small>
                             <small>
                               通常{yen(loan.monthlyPayment)} / 追加
                               {yen(loan.extraPayment)} / 年率
                               {percentFormatter.format(loan.apr)}%
+                              {loan.totalPayments > 0
+                                ? ` / 全${loan.totalPayments}回・済${paidCount}回・残${Math.max(0, loan.totalPayments - paidCount)}回`
+                                : paidCount > 0
+                                  ? ` / 返済済${paidCount}回`
+                                  : ''}
                             </small>
                             {linkedFixedTotal > 0 ? (
                               <small>
@@ -1407,6 +1513,21 @@ function App() {
                             />
                           </label>
                           <label className="mini-field">
+                            <span>返済回数（総回数）</span>
+                            <input
+                              inputMode="numeric"
+                              type="number"
+                              min="0"
+                              value={loan.totalPayments || ''}
+                              onChange={(event) =>
+                                updateLoan(loan.id, {
+                                  totalPayments: Number(event.target.value),
+                                })
+                              }
+                              placeholder="36"
+                            />
+                          </label>
+                          <label className="mini-field">
                             <span>月返済</span>
                             <input
                               inputMode="numeric"
@@ -1448,7 +1569,7 @@ function App() {
                               }
                             />
                           </label>
-                          <label className="mini-field full-span">
+                          <label className="mini-field">
                             <span>種別</span>
                             <select
                               value={loan.kind}
