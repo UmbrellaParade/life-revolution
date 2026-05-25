@@ -14,7 +14,6 @@ import {
   Gauge,
   Upload,
   HandCoins,
-  Landmark,
   Lightbulb,
   LineChart,
   PiggyBank,
