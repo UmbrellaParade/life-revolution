@@ -230,6 +230,10 @@ textarea {
   padding: 14px;
 }
 
+.focus-strip.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .entry-form,
 .compact-form {
   display: grid;

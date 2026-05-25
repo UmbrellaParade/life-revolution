@@ -1266,7 +1266,7 @@ function App() {
             </div>
 
             {/* ── TOP：合計サマリー ── */}
-            <div className="focus-strip" style={{ marginBottom: 16 }}>
+            <div className="focus-strip cols-3" style={{ marginBottom: 16 }}>
               <div>
                 <span>目標総額</span>
                 <strong>{yen((data.savingsGoals ?? []).reduce((s, g) => s + g.targetAmount, 0))}</strong>
