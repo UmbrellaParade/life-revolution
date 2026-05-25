@@ -466,24 +466,106 @@ button {
   text-decoration: line-through;
 }
 
-.strategy-preview {
-  color: var(--muted);
-  display: -webkit-box;
-  font-size: 12px;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
+.strategy-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.strategy-add-toggle {
+  align-items: center;
+  background: var(--green);
+  border-radius: 8px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 6px;
+  padding: 8px 14px;
+}
+
+.strategy-form {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.strategy-form-title {
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.strategy-form-body {
+  min-height: 110px;
+}
+
+.strategy-board {
+  columns: 2;
+  gap: 12px;
+}
+
+.strategy-card {
+  background: #fffdf0;
+  border: 1px solid #e8d87a;
+  border-radius: 8px;
+  break-inside: avoid;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 14px;
+}
+
+.strategy-card-title {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #e8d87a;
+  border-radius: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  min-height: unset;
+  padding: 0 0 8px;
+}
+
+.strategy-card-title:focus {
+  border-color: var(--blue);
+  box-shadow: none;
+  outline: none;
+}
+
+.strategy-card-body {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.7;
+  min-height: 80px;
+  padding: 0;
+  resize: vertical;
   white-space: pre-wrap;
 }
 
-.strategy-edit {
-  display: grid;
-  gap: 8px;
-  width: 100%;
+.strategy-card-body:focus {
+  border: none;
+  box-shadow: none;
+  outline: none;
 }
 
-.strategy-edit textarea {
-  min-height: 120px;
+.strategy-card-footer {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.strategy-card-footer span {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .data-export-buttons {
@@ -633,5 +715,9 @@ button {
 
   .segmented {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .strategy-board {
+    columns: 1;
   }
 }

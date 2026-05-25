@@ -324,7 +324,7 @@ function App() {
   const [importText, setImportText] = useState('')
   const [importMessage, setImportMessage] = useState('')
   const [strategyDraft, setStrategyDraft] = useState({ title: '', content: '' })
-  const [expandedStrategyIds, setExpandedStrategyNoteIds] = useState<Set<string>>(new Set())
+  const [isStrategyFormOpen, setIsStrategyFormOpen] = useState(false)
   const [expandedLoanIds, setExpandedLoanIds] = useState<Set<string>>(new Set())
   const [expandedFixedIds, setExpandedFixedIds] = useState<Set<string>>(new Set())
 
@@ -339,15 +339,6 @@ function App() {
 
   function toggleFixedExpanded(id: string) {
     setExpandedFixedIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  function toggleStrategyExpanded(id: string) {
-    setExpandedStrategyNoteIds((current) => {
       const next = new Set(current)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -1885,7 +1876,7 @@ function App() {
           </section>
 
           <section
-            className={activeTab === 'strategy' ? 'panel active-panel' : 'panel'}
+            className={activeTab === 'strategy' ? 'panel active-panel strategy-panel' : 'panel strategy-panel'}
             aria-label="貯金戦略メモ"
           >
             <div className="panel-heading">
@@ -1893,116 +1884,90 @@ function App() {
                 <p className="eyebrow">Strategy</p>
                 <h2>貯金・返済の戦略メモ</h2>
               </div>
-              <Lightbulb size={22} />
+              <button
+                className="strategy-add-toggle"
+                type="button"
+                onClick={() => setIsStrategyFormOpen((v) => !v)}
+                aria-label={isStrategyFormOpen ? '追加フォームを閉じる' : '新しいメモを追加'}
+                title={isStrategyFormOpen ? '閉じる' : 'メモを追加する'}
+              >
+                <Plus
+                  size={20}
+                  style={{
+                    transform: isStrategyFormOpen ? 'rotate(45deg)' : 'none',
+                    transition: 'transform 0.2s',
+                  }}
+                />
+                {isStrategyFormOpen ? '閉じる' : 'メモを追加'}
+              </button>
             </div>
 
-            <form className="entry-form" onSubmit={addStrategyNote}>
-              <label>
-                <span>タイトル</span>
+            {isStrategyFormOpen && (
+              <form className="strategy-form" onSubmit={(e) => { addStrategyNote(e); setIsStrategyFormOpen(false) }}>
                 <input
                   value={strategyDraft.title}
                   onChange={(event) =>
                     setStrategyDraft((current) => ({ ...current, title: event.target.value }))
                   }
-                  placeholder="繰り上げ返済プラン"
+                  placeholder="タイトル（例：繰り上げ返済プラン）"
+                  className="strategy-form-title"
                 />
-              </label>
-              <label>
-                <span>内容</span>
                 <textarea
-                  rows={4}
+                  rows={5}
                   value={strategyDraft.content}
                   onChange={(event) =>
                     setStrategyDraft((current) => ({ ...current, content: event.target.value }))
                   }
-                  placeholder={'例）毎月5,000円を追加返済に回す。\nボーナス月は20,000円追加して早期完済を目指す。'}
+                  placeholder={'内容を書いてください。\n例）毎月5,000円を追加返済に回す。\nボーナス月は20,000円追加して早期完済を目指す。'}
+                  className="strategy-form-body"
                 />
-              </label>
-              <button
-                className="primary-button"
-                type="submit"
-                disabled={!strategyDraft.title.trim() && !strategyDraft.content.trim()}
-              >
-                <Plus size={18} />
-                メモを追加
-              </button>
-            </form>
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={!strategyDraft.title.trim() && !strategyDraft.content.trim()}
+                >
+                  <Plus size={18} />
+                  追加する
+                </button>
+              </form>
+            )}
 
-            <div className="list-block">
-              <div className="list-heading">
-                <h3>戦略メモ一覧</h3>
-                <span>{data.strategyNotes.length}件</span>
+            {data.strategyNotes.length === 0 ? (
+              <p className="empty-text">右上の「メモを追加」からメモを作成してください</p>
+            ) : (
+              <div className="strategy-board">
+                {data.strategyNotes.map((note) => (
+                  <div key={note.id} className="strategy-card">
+                    <input
+                      className="strategy-card-title"
+                      value={note.title}
+                      onChange={(event) =>
+                        updateStrategyNote(note.id, { title: event.target.value })
+                      }
+                    />
+                    <textarea
+                      className="strategy-card-body"
+                      value={note.content}
+                      onChange={(event) =>
+                        updateStrategyNote(note.id, { content: event.target.value })
+                      }
+                    />
+                    <div className="strategy-card-footer">
+                      <span>{note.createdAt}</span>
+                      <button
+                        className="icon-button subtle"
+                        type="button"
+                        onClick={() => deleteStrategyNote(note.id)}
+                        aria-label="メモを削除"
+                        title="メモを削除"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              {data.strategyNotes.length === 0 ? (
-                <p className="empty-text">まだメモがありません</p>
-              ) : (
-                <ul className="item-list">
-                  {data.strategyNotes.map((note) => {
-                    const isExpanded = expandedStrategyIds.has(note.id)
-                    return (
-                      <li key={note.id} className="stacked-item">
-                        <div className="item-row">
-                          <div className="item-main">
-                            <span>{note.title}</span>
-                            {!isExpanded && note.content ? (
-                              <small className="strategy-preview">{note.content}</small>
-                            ) : null}
-                            <small>{note.createdAt}</small>
-                          </div>
-                          <button
-                            className="icon-button subtle"
-                            type="button"
-                            onClick={() => toggleStrategyExpanded(note.id)}
-                            aria-label={isExpanded ? '折りたたむ' : '編集する'}
-                            title={isExpanded ? '折りたたむ' : '編集する'}
-                          >
-                            <ChevronDown
-                              size={17}
-                              style={{
-                                transform: isExpanded ? 'rotate(180deg)' : 'none',
-                                transition: 'transform 0.2s',
-                              }}
-                            />
-                          </button>
-                          <button
-                            className="icon-button subtle"
-                            type="button"
-                            onClick={() => deleteStrategyNote(note.id)}
-                            aria-label="メモを削除"
-                            title="メモを削除"
-                          >
-                            <Trash2 size={17} />
-                          </button>
-                        </div>
-                        {isExpanded && (
-                          <div className="strategy-edit">
-                            <label className="mini-field full-span">
-                              <span>タイトル</span>
-                              <input
-                                value={note.title}
-                                onChange={(event) =>
-                                  updateStrategyNote(note.id, { title: event.target.value })
-                                }
-                              />
-                            </label>
-                            <label className="mini-field full-span">
-                              <span>内容</span>
-                              <textarea
-                                rows={5}
-                                value={note.content}
-                                onChange={(event) =>
-                                  updateStrategyNote(note.id, { content: event.target.value })
-                                }
-                              />
-                            </label>
-                          </div>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
+            )}
           </section>
         </div>
       </main>
