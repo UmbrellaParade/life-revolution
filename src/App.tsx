@@ -731,6 +731,12 @@ function App() {
     downloadCsv(`ローン一覧-${todayValue()}.csv`, rows)
   }
 
+  function exportAllCsv() {
+    exportExpensesCsv()
+    setTimeout(() => exportFixedCostsCsv(), 300)
+    setTimeout(() => exportLoansCsv(), 600)
+  }
+
   function importData() {
     try {
       const importedData = normalizeData(JSON.parse(importText))
@@ -1721,18 +1727,22 @@ function App() {
                 <h3>CSVエクスポート</h3>
                 <p>Excel・Google Sheetsで開けるCSVファイルを出力します。</p>
               </div>
+              <button className="primary-button" type="button" onClick={exportAllCsv}>
+                <Download size={17} />
+                全データCSV一括出力
+              </button>
               <div className="csv-buttons">
                 <button className="secondary-button" type="button" onClick={exportExpensesCsv}>
                   <Download size={17} />
-                  支出CSV
+                  支出のみ
                 </button>
                 <button className="secondary-button" type="button" onClick={exportFixedCostsCsv}>
                   <Download size={17} />
-                  固定費CSV
+                  固定費のみ
                 </button>
                 <button className="secondary-button" type="button" onClick={exportLoansCsv}>
                   <Download size={17} />
-                  ローンCSV
+                  ローンのみ
                 </button>
               </div>
             </div>
