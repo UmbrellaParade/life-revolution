@@ -78,15 +78,24 @@ type StrategyNote = {
   createdAt: string
 }
 
+type SavingsGoal = {
+  id: string
+  name: string
+  targetAmount: number
+  savedAmount: number
+  memo: string
+}
+
 type AppData = {
   expenses: Expense[]
   fixedCosts: FixedCost[]
   loans: Loan[]
   settings: Settings
   strategyNotes: StrategyNote[]
+  savingsGoals: SavingsGoal[]
 }
 
-type TabId = 'dashboard' | 'expense' | 'plans' | 'strategy'
+type TabId = 'dashboard' | 'expense' | 'savings' | 'plans' | 'strategy'
 
 const storageKey = 'yutori-ledger-data-v1'
 
@@ -122,6 +131,7 @@ const defaultData: AppData = {
     extraPayment: 0,
   },
   strategyNotes: [],
+  savingsGoals: [],
 }
 
 const currencyFormatter = new Intl.NumberFormat('ja-JP', {
@@ -325,6 +335,8 @@ function App() {
   const [importMessage, setImportMessage] = useState('')
   const [strategyDraft, setStrategyDraft] = useState({ title: '', content: '' })
   const [isStrategyFormOpen, setIsStrategyFormOpen] = useState(false)
+  const [savingsDraft, setSavingsDraft] = useState({ name: '', targetAmount: '', savedAmount: '', memo: '' })
+  const [editingSavingsId, setEditingSavingsId] = useState<string | null>(null)
   const [expandedLoanIds, setExpandedLoanIds] = useState<Set<string>>(new Set())
   const [expandedFixedIds, setExpandedFixedIds] = useState<Set<string>>(new Set())
 
@@ -382,6 +394,40 @@ function App() {
       ...current,
       strategyNotes: current.strategyNotes.filter((note) => note.id !== id),
     }))
+  }
+
+  function addSavingsGoal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!savingsDraft.name.trim()) return
+    const goal: SavingsGoal = {
+      id: createId(),
+      name: savingsDraft.name.trim(),
+      targetAmount: clampPositive(Number(savingsDraft.targetAmount)),
+      savedAmount: clampPositive(Number(savingsDraft.savedAmount)),
+      memo: savingsDraft.memo.trim(),
+    }
+    setData((current) => ({
+      ...current,
+      savingsGoals: [...(current.savingsGoals ?? []), goal],
+    }))
+    setSavingsDraft({ name: '', targetAmount: '', savedAmount: '', memo: '' })
+  }
+
+  function updateSavingsGoal(id: string, patch: Partial<SavingsGoal>) {
+    setData((current) => ({
+      ...current,
+      savingsGoals: (current.savingsGoals ?? []).map((g) =>
+        g.id === id ? { ...g, ...patch } : g,
+      ),
+    }))
+  }
+
+  function deleteSavingsGoal(id: string) {
+    setData((current) => ({
+      ...current,
+      savingsGoals: (current.savingsGoals ?? []).filter((g) => g.id !== id),
+    }))
+    if (editingSavingsId === id) setEditingSavingsId(null)
   }
 
   useEffect(() => {
@@ -1182,6 +1228,193 @@ function App() {
                 </ul>
               )}
             </div>
+          </section>
+
+          {/* ── 希望貯金パネル ── */}
+          <section
+            className={activeTab === 'savings' ? 'panel active-panel' : 'panel'}
+            aria-label="希望貯金"
+          >
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Savings</p>
+                <h2>希望貯金</h2>
+              </div>
+              <PiggyBank size={22} />
+            </div>
+
+            {/* 追加フォーム */}
+            <form className="entry-form" onSubmit={addSavingsGoal}>
+              <div className="settings-grid">
+                <label>
+                  <span>用途名</span>
+                  <input
+                    type="text"
+                    placeholder="例：旅行、車の頭金"
+                    value={savingsDraft.name}
+                    onChange={(e) => setSavingsDraft((d) => ({ ...d, name: e.target.value }))}
+                  />
+                </label>
+                <label>
+                  <span>目標金額</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={savingsDraft.targetAmount}
+                    onChange={(e) => setSavingsDraft((d) => ({ ...d, targetAmount: e.target.value }))}
+                  />
+                </label>
+                <label>
+                  <span>現在の貯金額</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={savingsDraft.savedAmount}
+                    onChange={(e) => setSavingsDraft((d) => ({ ...d, savedAmount: e.target.value }))}
+                  />
+                </label>
+                <label>
+                  <span>メモ</span>
+                  <input
+                    type="text"
+                    placeholder="備考など"
+                    value={savingsDraft.memo}
+                    onChange={(e) => setSavingsDraft((d) => ({ ...d, memo: e.target.value }))}
+                  />
+                </label>
+              </div>
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={!savingsDraft.name.trim()}
+              >
+                <Plus size={16} />
+                貯金目標を追加
+              </button>
+            </form>
+
+            {/* 目標リスト */}
+            <div className="list-block">
+              <div className="list-heading">
+                <h3>貯金目標一覧</h3>
+                <span>{(data.savingsGoals ?? []).length}件</span>
+              </div>
+              {(data.savingsGoals ?? []).length === 0 ? (
+                <p className="empty-text">貯金目標がまだありません</p>
+              ) : (
+                <ul className="item-list">
+                  {(data.savingsGoals ?? []).map((goal) => {
+                    const pct = goal.targetAmount > 0
+                      ? Math.min(100, Math.round((goal.savedAmount / goal.targetAmount) * 100))
+                      : 0
+                    const remaining = Math.max(0, goal.targetAmount - goal.savedAmount)
+                    const isEditing = editingSavingsId === goal.id
+                    return (
+                      <li key={goal.id} className={isEditing ? 'stacked-item' : ''}>
+                        {isEditing ? (
+                          <div className="edit-grid" style={{ width: '100%' }}>
+                            <label className="mini-field">
+                              <span>用途名</span>
+                              <input
+                                type="text"
+                                value={goal.name}
+                                onChange={(e) => updateSavingsGoal(goal.id, { name: e.target.value })}
+                              />
+                            </label>
+                            <label className="mini-field">
+                              <span>目標金額</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={goal.targetAmount}
+                                onChange={(e) => updateSavingsGoal(goal.id, { targetAmount: clampPositive(Number(e.target.value)) })}
+                              />
+                            </label>
+                            <label className="mini-field">
+                              <span>現在の貯金額</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={goal.savedAmount}
+                                onChange={(e) => updateSavingsGoal(goal.id, { savedAmount: clampPositive(Number(e.target.value)) })}
+                              />
+                            </label>
+                            <label className="mini-field">
+                              <span>メモ</span>
+                              <input
+                                type="text"
+                                value={goal.memo}
+                                onChange={(e) => updateSavingsGoal(goal.id, { memo: e.target.value })}
+                              />
+                            </label>
+                            <div className="full-span" style={{ display: 'flex', gap: 8 }}>
+                              <button
+                                className="primary-button"
+                                type="button"
+                                style={{ flex: 1 }}
+                                onClick={() => setEditingSavingsId(null)}
+                              >
+                                完了
+                              </button>
+                              <button
+                                className="icon-button subtle"
+                                type="button"
+                                onClick={() => deleteSavingsGoal(goal.id)}
+                                aria-label="削除"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="item-row">
+                            <div className="item-main">
+                              <span>{goal.name}</span>
+                              {goal.memo && <small>{goal.memo}</small>}
+                              {/* プログレスバー */}
+                              <div className="savings-progress-bar">
+                                <div
+                                  className="savings-progress-fill"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <small style={{ color: 'var(--green)', fontWeight: 750 }}>
+                                {yen(goal.savedAmount)} / {yen(goal.targetAmount)}
+                                <span style={{ color: 'var(--muted)' }}>（あと {yen(remaining)}・{pct}%）</span>
+                              </small>
+                            </div>
+                            <button
+                              className="icon-button subtle"
+                              type="button"
+                              onClick={() => setEditingSavingsId(goal.id)}
+                              aria-label="編集"
+                            >
+                              <ChevronDown size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* 合計サマリー */}
+            {(data.savingsGoals ?? []).length > 0 && (
+              <div className="focus-strip" style={{ marginTop: 16 }}>
+                <div>
+                  <span>目標総額</span>
+                  <strong>{yen((data.savingsGoals ?? []).reduce((s, g) => s + g.targetAmount, 0))}</strong>
+                </div>
+                <div>
+                  <span>貯金済み合計</span>
+                  <strong style={{ color: 'var(--green)' }}>{yen((data.savingsGoals ?? []).reduce((s, g) => s + g.savedAmount, 0))}</strong>
+                </div>
+              </div>
+            )}
           </section>
 
           <section
@@ -1991,6 +2224,14 @@ function App() {
         >
           <Plus size={19} />
           <span>入力</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'savings' ? 'active' : undefined}
+          onClick={() => setActiveTab('savings')}
+        >
+          <PiggyBank size={19} />
+          <span>貯金</span>
         </button>
         <button
           type="button"

@@ -441,6 +441,22 @@ button {
   margin: 0;
 }
 
+.savings-progress-bar {
+  background: var(--line);
+  border-radius: 4px;
+  height: 6px;
+  margin: 4px 0 2px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.savings-progress-fill {
+  background: var(--green);
+  border-radius: 4px;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
 .funded-button {
   background: var(--field);
   border: 1px solid var(--line-strong);
@@ -656,10 +672,11 @@ button {
   color: var(--muted);
   flex: 1;
   flex-direction: column;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 750;
   gap: 3px;
   min-height: 54px;
+  padding: 6px 2px;
 }
 
 .bottom-nav button.active {
