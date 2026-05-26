@@ -1243,7 +1243,7 @@ function App() {
                   type="text"
                   value={data.settings.repaymentTarget}
                   onChange={(e) => updateSettings({ repaymentTarget: e.target.value })}
-                  placeholder="例：メルカリローン"
+                  placeholder="例：クレジット1ローン"
                   style={{ fontSize: 15, fontWeight: 750, minHeight: 36, marginTop: 2 }}
                 />
               </div>
