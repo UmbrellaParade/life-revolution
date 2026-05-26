@@ -415,6 +415,8 @@ function App() {
   const [isSavingsFormOpen, setIsSavingsFormOpen] = useState(false)
   const [isRuleFormOpen, setIsRuleFormOpen] = useState(false)
   const [ruleDraft, setRuleDraft] = useState({ categories: [] as string[], rule: '' })
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
+  const [editingRuleDraft, setEditingRuleDraft] = useState({ categories: [] as string[], rule: '' })
   const [brakeConfirmed, setBrakeConfirmed] = useState(false)
   const [isInvestmentCheck, setIsInvestmentCheck] = useState(false)
   const [noAlternativeCheck, setNoAlternativeCheck] = useState(false)
@@ -527,6 +529,13 @@ function App() {
 
   function deleteExpenseRule(id: string) {
     setData((c) => ({ ...c, expenseRules: (c.expenseRules ?? []).filter((r) => r.id !== id) }))
+  }
+
+  function updateExpenseRule(id: string, patch: Partial<ExpenseRule>) {
+    setData((c) => ({
+      ...c,
+      expenseRules: (c.expenseRules ?? []).map((r) => r.id === id ? { ...r, ...patch } : r),
+    }))
   }
 
   function addIncomeItem(event: FormEvent<HTMLFormElement>) {
@@ -1464,12 +1473,12 @@ function App() {
                           <input
                             type="checkbox"
                             checked={ruleDraft.categories.includes(c)}
-                            onChange={(e) => {
+                            onChange={() => {
                               setRuleDraft((d) => ({
                                 ...d,
-                                categories: e.target.checked
-                                  ? [...d.categories, c]
-                                  : d.categories.filter((x) => x !== c),
+                                categories: d.categories.includes(c)
+                                  ? d.categories.filter((x) => x !== c)
+                                  : [...d.categories, c],
                               }))
                             }}
                           />
@@ -1499,19 +1508,77 @@ function App() {
                   {(data.expenseRules ?? []).length > 0 && (
                     <ul className="item-list" style={{ marginTop: 4 }}>
                       {(data.expenseRules ?? []).map((r) => (
-                        <li key={r.id} style={{ justifyContent: 'space-between' }}>
-                          <div>
-                            <span style={{ fontWeight: 750, fontSize: 13, color: 'var(--ink)' }}>{r.categories.join('・')}</span>
-                            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--muted)' }}>{r.rule}</p>
-                          </div>
-                          <button
-                            className="icon-button subtle"
-                            type="button"
-                            onClick={() => deleteExpenseRule(r.id)}
-                            aria-label="削除"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                        <li key={r.id} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                          {editingRuleId === r.id ? (
+                            <div style={{ display: 'grid', gap: 8 }}>
+                              <div>
+                                <span style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>適用カテゴリ</span>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 12px' }}>
+                                  {categories.map((c) => (
+                                    <label key={c} className="check-label" style={{ fontSize: 13 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={editingRuleDraft.categories.includes(c)}
+                                        onChange={() => {
+                                          setEditingRuleDraft((d) => ({
+                                            ...d,
+                                            categories: d.categories.includes(c)
+                                              ? d.categories.filter((x) => x !== c)
+                                              : [...d.categories, c],
+                                          }))
+                                        }}
+                                      />
+                                      <span>{c}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                              <label>
+                                <span>ルール文</span>
+                                <input
+                                  type="text"
+                                  value={editingRuleDraft.rule}
+                                  onChange={(e) => setEditingRuleDraft((d) => ({ ...d, rule: e.target.value }))}
+                                />
+                              </label>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button
+                                  className="secondary-button"
+                                  type="button"
+                                  style={{ flex: 1 }}
+                                  disabled={!editingRuleDraft.rule.trim() || editingRuleDraft.categories.length === 0}
+                                  onClick={() => {
+                                    updateExpenseRule(r.id, { categories: editingRuleDraft.categories, rule: editingRuleDraft.rule.trim() })
+                                    setEditingRuleId(null)
+                                  }}
+                                >
+                                  保存
+                                </button>
+                                <button
+                                  className="icon-button subtle"
+                                  type="button"
+                                  onClick={() => setEditingRuleId(null)}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => { setEditingRuleId(r.id); setEditingRuleDraft({ categories: r.categories, rule: r.rule }) }}>
+                                <span style={{ fontWeight: 750, fontSize: 13, color: 'var(--ink)' }}>{r.categories.join('・')}</span>
+                                <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--muted)' }}>{r.rule}</p>
+                              </div>
+                              <button
+                                className="icon-button subtle"
+                                type="button"
+                                onClick={() => deleteExpenseRule(r.id)}
+                                aria-label="削除"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>
