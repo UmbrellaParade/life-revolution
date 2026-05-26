@@ -1591,7 +1591,7 @@ function App() {
                               })
                             }
                           >
-                            {paymentMethods.map((method) => (
+                            {allPaymentMethods.map((method) => (
                               <option key={method}>{method}</option>
                             ))}
                           </select>
@@ -2184,7 +2184,7 @@ function App() {
                         }))
                       }
                     >
-                      {paymentMethods.map((method) => (
+                      {allPaymentMethods.map((method) => (
                         <option key={method}>{method}</option>
                       ))}
                     </select>
