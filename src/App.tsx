@@ -89,6 +89,7 @@ type SavingsGoal = {
   id: string
   name: string
   monthlyTarget: number
+  nextMonthlyTarget: number
   targetAmount: number
   savedAmount: number
   memo: string
@@ -137,9 +138,8 @@ const categories = [
 ]
 
 const paymentMethods = [
-  'メルカリショッピング',
-  'メルカリローン',
-  'イオン',
+  'クレジット',
+  'デビット',
   '銀行',
   '現金',
   'その他',
@@ -149,7 +149,7 @@ const loanKinds = ['ショッピング', 'キャッシング', 'カードロー�
 
 const fixedGenres = ['住居', '通信', '保険', 'サブスク', '食費', '医療', '教育', 'その他']
 
-const stageLabelMap = { short: '直近', mid: '中期', final: '最終' } as const
+const stageLabelMap = { short: '直近', mid: '次の', final: '最終' } as const
 
 const defaultData: AppData = {
   expenses: [],
@@ -294,6 +294,7 @@ function normalizeData(importedData: Partial<AppData>): AppData {
     id: goal.id || createId(),
     name: goal.name || '',
     monthlyTarget: Number(goal.monthlyTarget) || 0,
+    nextMonthlyTarget: Number(goal.nextMonthlyTarget) || 0,
     targetAmount: Number(goal.targetAmount) || 0,
     savedAmount: Number(goal.savedAmount) || 0,
     memo: goal.memo || '',
@@ -402,7 +403,7 @@ function App() {
   const [importMessage, setImportMessage] = useState('')
   const [strategyDraft, setStrategyDraft] = useState({ title: '', content: '' })
   const [isStrategyFormOpen, setIsStrategyFormOpen] = useState(false)
-  const [savingsDraft, setSavingsDraft] = useState({ name: '', monthlyTarget: '', targetAmount: '', savedAmount: '', memo: '', level: 'short' as 'short' | 'mid' | 'final' })
+  const [savingsDraft, setSavingsDraft] = useState({ name: '', monthlyTarget: '', nextMonthlyTarget: '', targetAmount: '', savedAmount: '', memo: '', level: 'short' as 'short' | 'mid' | 'final' })
   const [editingSavingsId, setEditingSavingsId] = useState<string | null>(null)
   const [isLoanTotalVisible, setIsLoanTotalVisible] = useState(false)
   const [isSavingsFormOpen, setIsSavingsFormOpen] = useState(false)
@@ -482,6 +483,7 @@ function App() {
       id: createId(),
       name: savingsDraft.name.trim(),
       monthlyTarget: clampPositive(Number(savingsDraft.monthlyTarget)),
+      nextMonthlyTarget: clampPositive(Number(savingsDraft.nextMonthlyTarget)),
       targetAmount: clampPositive(Number(savingsDraft.targetAmount)),
       savedAmount: clampPositive(Number(savingsDraft.savedAmount)),
       memo: savingsDraft.memo.trim(),
@@ -491,7 +493,7 @@ function App() {
       ...current,
       savingsGoals: [...(current.savingsGoals ?? []), goal],
     }))
-    setSavingsDraft({ name: '', monthlyTarget: '', targetAmount: '', savedAmount: '', memo: '', level: 'short' })
+    setSavingsDraft({ name: '', monthlyTarget: '', nextMonthlyTarget: '', targetAmount: '', savedAmount: '', memo: '', level: 'short' })
   }
 
   function updateSavingsGoal(id: string, patch: Partial<SavingsGoal>) {
@@ -1713,18 +1715,28 @@ function App() {
                                 onChange={(e) => updateSavingsGoal(goal.id, { level: e.target.value as 'short' | 'mid' | 'final' })}
                               >
                                 <option value="short">直近目標</option>
-                                <option value="mid">中期目標</option>
+                                <option value="mid">次の目標</option>
                                 <option value="final">最終目標</option>
                               </select>
                             </label>
                             <label className="mini-field">
-                              <span>月の貯金希望額</span>
+                              <span>直近の月間貯金希望額</span>
                               <input
                                 type="number"
                                 min="0"
                                 value={goal.monthlyTarget}
                                 onFocus={(e) => e.target.select()}
                                 onChange={(e) => updateSavingsGoal(goal.id, { monthlyTarget: clampPositive(Number(e.target.value)) })}
+                              />
+                            </label>
+                            <label className="mini-field">
+                              <span>次の目標月間貯金額</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={goal.nextMonthlyTarget ?? 0}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => updateSavingsGoal(goal.id, { nextMonthlyTarget: clampPositive(Number(e.target.value)) })}
                               />
                             </label>
                             <label className="mini-field">
@@ -1808,7 +1820,12 @@ function App() {
                               </span>
                               {goal.memo && <small>{goal.memo}</small>}
                               {goal.monthlyTarget > 0 && (
-                                <small style={{ color: 'var(--muted)' }}>月の希望額：{yen(goal.monthlyTarget)}</small>
+                                <small style={{ color: 'var(--muted)' }}>
+                                  直近月間希望額：{yen(goal.monthlyTarget)}
+                                  {(goal.nextMonthlyTarget ?? 0) > 0 && (
+                                    <span style={{ marginLeft: 6 }}>→ 次の目標：{yen(goal.nextMonthlyTarget)}</span>
+                                  )}
+                                </small>
                               )}
                               <div className="savings-progress-bar">
                                 <div
@@ -1868,12 +1885,12 @@ function App() {
                         onChange={(e) => setSavingsDraft((d) => ({ ...d, level: e.target.value as 'short' | 'mid' | 'final' }))}
                       >
                         <option value="short">直近目標</option>
-                        <option value="mid">中期目標</option>
+                        <option value="mid">次の目標</option>
                         <option value="final">最終目標</option>
                       </select>
                     </label>
                     <label>
-                      <span>月の貯金希望額</span>
+                      <span>直近の月間貯金希望額</span>
                       <input
                         type="number"
                         min="0"
@@ -1881,6 +1898,17 @@ function App() {
                         value={savingsDraft.monthlyTarget}
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => setSavingsDraft((d) => ({ ...d, monthlyTarget: e.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      <span>次の目標月間貯金額</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={savingsDraft.nextMonthlyTarget}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setSavingsDraft((d) => ({ ...d, nextMonthlyTarget: e.target.value }))}
                       />
                     </label>
                     <label>
