@@ -620,11 +620,16 @@ function App() {
       data.settings.bufferTarget +
       variableSpent
     const remaining = data.settings.monthlyIncome - plannedOutflow
-    const payoffMonths = estimateMonths(
-      debtTotal,
-      loanPaymentTotal,
-      weightedApr,
-    )
+    const targetLoan = data.settings.repaymentTarget
+      ? data.loans.find((l) => l.name === data.settings.repaymentTarget)
+      : null
+    const payoffMonths = targetLoan
+      ? estimateMonths(
+          loanPayable(targetLoan),
+          targetLoan.monthlyPayment + targetLoan.extraPayment,
+          targetLoan.aprType === 'total' ? 0 : targetLoan.apr,
+        )
+      : estimateMonths(debtTotal, loanPaymentTotal, weightedApr)
 
     return {
       variableSpent,
