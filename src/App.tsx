@@ -100,7 +100,7 @@ type SavingsGoal = {
 
 type ExpenseRule = {
   id: string
-  category: string
+  categories: string[]
   rule: string
 }
 
@@ -307,7 +307,7 @@ function normalizeData(importedData: Partial<AppData>): AppData {
 
   const expenseRules = (importedData.expenseRules ?? []).map((r) => ({
     id: r.id || createId(),
-    category: r.category || '',
+    categories: Array.isArray(r.categories) ? r.categories : (r as any).category ? [(r as any).category] : [],
     rule: r.rule || '',
   }))
 
@@ -414,7 +414,7 @@ function App() {
   const [isLoanTotalVisible, setIsLoanTotalVisible] = useState(false)
   const [isSavingsFormOpen, setIsSavingsFormOpen] = useState(false)
   const [isRuleFormOpen, setIsRuleFormOpen] = useState(false)
-  const [ruleDraft, setRuleDraft] = useState({ category: categories[0], rule: '' })
+  const [ruleDraft, setRuleDraft] = useState({ categories: [] as string[], rule: '' })
   const [brakeConfirmed, setBrakeConfirmed] = useState(false)
   const [isInvestmentCheck, setIsInvestmentCheck] = useState(false)
   const [noAlternativeCheck, setNoAlternativeCheck] = useState(false)
@@ -519,10 +519,10 @@ function App() {
   }
 
   function addExpenseRule() {
-    if (!ruleDraft.rule.trim()) return
-    const newRule: ExpenseRule = { id: createId(), category: ruleDraft.category, rule: ruleDraft.rule.trim() }
+    if (!ruleDraft.rule.trim() || ruleDraft.categories.length === 0) return
+    const newRule: ExpenseRule = { id: createId(), categories: ruleDraft.categories, rule: ruleDraft.rule.trim() }
     setData((c) => ({ ...c, expenseRules: [...(c.expenseRules ?? []), newRule] }))
-    setRuleDraft({ category: categories[0], rule: '' })
+    setRuleDraft({ categories: [], rule: '' })
   }
 
   function deleteExpenseRule(id: string) {
@@ -693,7 +693,7 @@ function App() {
   )
 
   const activeRule = useMemo(
-    () => (data.expenseRules ?? []).find((r) => r.category === expenseDraft.category) ?? null,
+    () => (data.expenseRules ?? []).find((r) => r.categories.includes(expenseDraft.category)) ?? null,
     [data.expenseRules, expenseDraft.category],
   )
 
@@ -1354,7 +1354,7 @@ function App() {
                   <div className="rule-warning">
                     <span className="rule-warning-icon">⚠️</span>
                     <div>
-                      <strong>支出ブレーキ：{activeRule.category}</strong>
+                      <strong>支出ブレーキ：{activeRule.categories.join('・')}</strong>
                       <p>{activeRule.rule}</p>
                     </div>
                   </div>
@@ -1456,31 +1456,42 @@ function App() {
               </button>
               {isRuleFormOpen && (
                 <div className="strategy-form" style={{ marginTop: 8 }}>
-                  <div className="inline-fields" style={{ alignItems: 'end' }}>
-                    <label>
-                      <span>カテゴリ</span>
-                      <select
-                        value={ruleDraft.category}
-                        onChange={(e) => setRuleDraft((d) => ({ ...d, category: e.target.value }))}
-                      >
-                        {categories.map((c) => <option key={c}>{c}</option>)}
-                      </select>
-                    </label>
-                    <label>
-                      <span>ルール文</span>
-                      <input
-                        type="text"
-                        placeholder="例：月3回まで"
-                        value={ruleDraft.rule}
-                        onChange={(e) => setRuleDraft((d) => ({ ...d, rule: e.target.value }))}
-                      />
-                    </label>
+                  <div style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>適用カテゴリ（複数選択可）</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 12px' }}>
+                      {categories.map((c) => (
+                        <label key={c} className="check-label" style={{ fontSize: 13 }}>
+                          <input
+                            type="checkbox"
+                            checked={ruleDraft.categories.includes(c)}
+                            onChange={(e) => {
+                              setRuleDraft((d) => ({
+                                ...d,
+                                categories: e.target.checked
+                                  ? [...d.categories, c]
+                                  : d.categories.filter((x) => x !== c),
+                              }))
+                            }}
+                          />
+                          <span>{c}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
+                  <label>
+                    <span>ルール文</span>
+                    <input
+                      type="text"
+                      placeholder="例：月3回まで"
+                      value={ruleDraft.rule}
+                      onChange={(e) => setRuleDraft((d) => ({ ...d, rule: e.target.value }))}
+                    />
+                  </label>
                   <button
                     className="secondary-button"
                     type="button"
                     onClick={addExpenseRule}
-                    disabled={!ruleDraft.rule.trim()}
+                    disabled={!ruleDraft.rule.trim() || ruleDraft.categories.length === 0}
                   >
                     <Plus size={15} />
                     ルールを追加
@@ -1490,7 +1501,7 @@ function App() {
                       {(data.expenseRules ?? []).map((r) => (
                         <li key={r.id} style={{ justifyContent: 'space-between' }}>
                           <div>
-                            <span style={{ fontWeight: 750, fontSize: 13, color: 'var(--ink)' }}>{r.category}</span>
+                            <span style={{ fontWeight: 750, fontSize: 13, color: 'var(--ink)' }}>{r.categories.join('・')}</span>
                             <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--muted)' }}>{r.rule}</p>
                           </div>
                           <button
