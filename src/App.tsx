@@ -77,6 +77,7 @@ type Settings = {
   extraPayment?: number
   paymentCards: string[]
   repaymentTarget: string
+  repaymentMonthlyTarget: number
 }
 
 type StrategyNote = {
@@ -162,6 +163,7 @@ const defaultData: AppData = {
     extraPayment: 0,
     paymentCards: [],
     repaymentTarget: '',
+    repaymentMonthlyTarget: 0,
   },
   strategyNotes: [],
   savingsGoals: [],
@@ -328,6 +330,7 @@ function normalizeData(importedData: Partial<AppData>): AppData {
       extraPayment: Number(importedSettings.extraPayment) || 0,
       paymentCards: Array.isArray(importedSettings.paymentCards) ? importedSettings.paymentCards : [],
       repaymentTarget: importedSettings.repaymentTarget || '',
+      repaymentMonthlyTarget: Number(importedSettings.repaymentMonthlyTarget) || 0,
     },
     strategyNotes,
     savingsGoals,
@@ -623,13 +626,20 @@ function App() {
     const targetLoan = data.settings.repaymentTarget
       ? data.loans.find((l) => l.name === data.settings.repaymentTarget)
       : null
-    const payoffMonths = targetLoan
+    const repayMonthly = data.settings.repaymentMonthlyTarget
+    const payoffMonths = targetLoan && repayMonthly > 0
       ? estimateMonths(
           loanPayable(targetLoan),
-          targetLoan.monthlyPayment + targetLoan.extraPayment,
+          repayMonthly,
           targetLoan.aprType === 'total' ? 0 : targetLoan.apr,
         )
-      : estimateMonths(debtTotal, loanPaymentTotal, weightedApr)
+      : targetLoan
+        ? estimateMonths(
+            loanPayable(targetLoan),
+            targetLoan.monthlyPayment + targetLoan.extraPayment,
+            targetLoan.aprType === 'total' ? 0 : targetLoan.apr,
+          )
+        : estimateMonths(debtTotal, loanPaymentTotal, weightedApr)
 
     return {
       variableSpent,
@@ -1201,6 +1211,17 @@ function App() {
                     <option key={loan.id} value={loan.name}>{loan.name}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <span>月の目標返済額</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={data.settings.repaymentMonthlyTarget || ''}
+                  onChange={(e) => updateSettings({ repaymentMonthlyTarget: clampPositive(Number(e.target.value)) })}
+                  placeholder="例：30000"
+                  style={{ fontSize: 15, fontWeight: 750, minHeight: 36, marginTop: 2 }}
+                />
               </div>
               <div>
                 <span>完済目安</span>
