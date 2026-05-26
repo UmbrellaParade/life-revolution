@@ -796,3 +796,277 @@ button {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ── ルール警告 ── */
+.rule-warning {
+  align-items: flex-start;
+  background: #fff8e1;
+  border: 1px solid #f0c040;
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+}
+
+.rule-warning-icon {
+  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.rule-warning strong {
+  color: #6f4700;
+  display: block;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.rule-warning p {
+  color: #8a5a00;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── ブレーキチェック ── */
+.brake-checks {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.check-label {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+}
+
+.check-label input[type="checkbox"] {
+  accent-color: var(--green);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  height: 18px;
+  min-height: unset;
+  width: 18px;
+}
+
+.check-label span {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── クレジットカードチップ ── */
+.card-chip {
+  align-items: center;
+  background: #e7f1ff;
+  border: 1px solid #a8c6f2;
+  border-radius: 20px;
+  color: #174e98;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 2px;
+  padding: 4px 10px 4px 12px;
+}
+
+/* ── 年間グラフ ── */
+.annual-chart-wrap {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  padding: 8px 0 0;
+}
+
+.annual-chart-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.annual-chart-label {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  writing-mode: vertical-rl;
+  height: 48px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.annual-chart-bar-wrap {
+  align-items: flex-end;
+  display: flex;
+  height: 80px;
+  width: 100%;
+}
+
+.annual-chart-bar {
+  background: var(--green);
+  border-radius: 4px 4px 0 0;
+  min-height: 2px;
+  opacity: 0.55;
+  transition: height 0.3s ease;
+  width: 100%;
+}
+
+.annual-chart-bar.selected {
+  opacity: 1;
+}
+
+.annual-chart-month {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ── 3段階サマリー ── */
+.stage-summary-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 16px;
+}
+
+.stage-card {
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.stage-card.stage-short {
+  background: #f0f8ff;
+  border-color: #a8c6f2;
+}
+
+.stage-card.stage-mid {
+  background: #f0fff4;
+  border-color: #90d4a8;
+}
+
+.stage-card.stage-final {
+  background: #fff8e1;
+  border-color: #f0c040;
+}
+
+.stage-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.stage-card strong {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.stage-card small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* ── 段階バッジ ── */
+.stage-badge {
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 6px;
+  padding: 1px 5px;
+  vertical-align: middle;
+}
+
+.stage-badge-short {
+  background: #e7f1ff;
+  border: 1px solid #a8c6f2;
+  color: #174e98;
+}
+
+.stage-badge-mid {
+  background: #e6f9ed;
+  border: 1px solid #90d4a8;
+  color: #1b6b3a;
+}
+
+.stage-badge-final {
+  background: #fff8e1;
+  border: 1px solid #f0c040;
+  color: #6f4700;
+}
+
+/* ── 投資バッジ ── */
+.invest-badge {
+  background: #e6f9ed;
+  border: 1px solid #90d4a8;
+  border-radius: 4px;
+  color: #1b6b3a;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 5px;
+  padding: 1px 5px;
+  vertical-align: middle;
+}
+
+/* ── 副収入グロースバー ── */
+.income-bar-wrap {
+  border-radius: 4px;
+  display: flex;
+  height: 6px;
+  margin: 4px 0 2px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.income-bar-current {
+  background: var(--green);
+  min-width: 4px;
+}
+
+.income-bar-projected {
+  background: #90d4a8;
+  min-width: 4px;
+}
+
+/* ── ジャンルヘッダー ── */
+.genre-header {
+  background: var(--soft);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  text-transform: uppercase;
+}
+
+/* ── 利率タイプ切替ボタン ── */
+.apr-type-toggle {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--blue);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 6px;
+  padding: 1px 4px;
+  text-decoration: underline;
+}
+
+.apr-type-toggle:hover {
+  background: #e7f1ff;
+}

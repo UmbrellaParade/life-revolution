@@ -45,6 +45,9 @@ type FixedCost = {
   loanId?: string
   active: boolean
   fundedMonths: string[]
+  genre: string
+  isInvestment: boolean
+  noAlternative: boolean
 }
 
 type LoanPaymentRecord = {
@@ -61,6 +64,7 @@ type Loan = {
   monthlyPayment: number
   extraPayment: number
   apr: number
+  aprType: 'annual' | 'total'
   kind: string
   totalPayments: number
   paymentHistory: LoanPaymentRecord[]
@@ -71,6 +75,7 @@ type Settings = {
   monthlyIncome: number
   bufferTarget: number
   extraPayment?: number
+  paymentCards: string[]
 }
 
 type StrategyNote = {
@@ -87,6 +92,22 @@ type SavingsGoal = {
   targetAmount: number
   savedAmount: number
   memo: string
+  level: 'short' | 'mid' | 'final'
+}
+
+type ExpenseRule = {
+  id: string
+  category: string
+  rule: string
+}
+
+type IncomeItem = {
+  id: string
+  name: string
+  currentAmount: number
+  projectedAmount: number
+  memo: string
+  updatedAt: string
 }
 
 type AppData = {
@@ -96,6 +117,8 @@ type AppData = {
   settings: Settings
   strategyNotes: StrategyNote[]
   savingsGoals: SavingsGoal[]
+  expenseRules: ExpenseRule[]
+  incomeItems: IncomeItem[]
 }
 
 type TabId = 'dashboard' | 'expense' | 'savings' | 'plans' | 'strategy'
@@ -124,6 +147,10 @@ const paymentMethods = [
 
 const loanKinds = ['ショッピング', 'キャッシング', 'カードローン', '奨学金']
 
+const fixedGenres = ['住居', '通信', '保険', 'サブスク', '食費', '医療', '教育', 'その他']
+
+const stageLabelMap = { short: '直近', mid: '中期', final: '最終' } as const
+
 const defaultData: AppData = {
   expenses: [],
   fixedCosts: [],
@@ -132,9 +159,12 @@ const defaultData: AppData = {
     monthlyIncome: 0,
     bufferTarget: 0,
     extraPayment: 0,
+    paymentCards: [],
   },
   strategyNotes: [],
   savingsGoals: [],
+  expenseRules: [],
+  incomeItems: [],
 }
 
 const currencyFormatter = new Intl.NumberFormat('ja-JP', {
@@ -218,6 +248,7 @@ function normalizeData(importedData: Partial<AppData>): AppData {
       monthlyPayment: Number(loan.monthlyPayment) || 0,
       extraPayment: Number(loan.extraPayment) || 0,
       apr: Number(loan.apr) || 0,
+      aprType: (loan.aprType === 'total' ? 'total' : 'annual') as 'annual' | 'total',
       kind: loan.kind || 'ローン',
       totalPayments: Number(loan.totalPayments) || 0,
       paymentHistory: Array.isArray(loan.paymentHistory) ? loan.paymentHistory : [],
@@ -246,6 +277,9 @@ function normalizeData(importedData: Partial<AppData>): AppData {
       loanId: inferLoanId(cost, loans),
       active: cost.active ?? true,
       fundedMonths: Array.isArray(cost.fundedMonths) ? cost.fundedMonths : [],
+      genre: cost.genre || 'その他',
+      isInvestment: cost.isInvestment ?? false,
+      noAlternative: cost.noAlternative ?? false,
     }))
     .filter((cost) => cost.name && cost.amount > 0)
 
@@ -263,6 +297,22 @@ function normalizeData(importedData: Partial<AppData>): AppData {
     targetAmount: Number(goal.targetAmount) || 0,
     savedAmount: Number(goal.savedAmount) || 0,
     memo: goal.memo || '',
+    level: (['short', 'mid', 'final'].includes(goal.level) ? goal.level : 'short') as 'short' | 'mid' | 'final',
+  }))
+
+  const expenseRules = (importedData.expenseRules ?? []).map((r) => ({
+    id: r.id || createId(),
+    category: r.category || '',
+    rule: r.rule || '',
+  }))
+
+  const incomeItems = (importedData.incomeItems ?? []).map((item) => ({
+    id: item.id || createId(),
+    name: item.name || '',
+    currentAmount: Number(item.currentAmount) || 0,
+    projectedAmount: Number(item.projectedAmount) || 0,
+    memo: item.memo || '',
+    updatedAt: item.updatedAt || todayValue(),
   }))
 
   return {
@@ -273,9 +323,12 @@ function normalizeData(importedData: Partial<AppData>): AppData {
       monthlyIncome: Number(importedSettings.monthlyIncome) || 0,
       bufferTarget: Number(importedSettings.bufferTarget) || 0,
       extraPayment: Number(importedSettings.extraPayment) || 0,
+      paymentCards: Array.isArray(importedSettings.paymentCards) ? importedSettings.paymentCards : [],
     },
     strategyNotes,
     savingsGoals,
+    expenseRules,
+    incomeItems,
   }
 }
 
@@ -333,6 +386,7 @@ function App() {
     dueDay: '1',
     method: paymentMethods[0],
     loanId: '',
+    genre: 'その他',
   })
   const [loanDraft, setLoanDraft] = useState({
     name: '',
@@ -348,10 +402,20 @@ function App() {
   const [importMessage, setImportMessage] = useState('')
   const [strategyDraft, setStrategyDraft] = useState({ title: '', content: '' })
   const [isStrategyFormOpen, setIsStrategyFormOpen] = useState(false)
-  const [savingsDraft, setSavingsDraft] = useState({ name: '', monthlyTarget: '', targetAmount: '', savedAmount: '', memo: '' })
+  const [savingsDraft, setSavingsDraft] = useState({ name: '', monthlyTarget: '', targetAmount: '', savedAmount: '', memo: '', level: 'short' as 'short' | 'mid' | 'final' })
   const [editingSavingsId, setEditingSavingsId] = useState<string | null>(null)
   const [isLoanTotalVisible, setIsLoanTotalVisible] = useState(false)
   const [isSavingsFormOpen, setIsSavingsFormOpen] = useState(false)
+  const [cardInput, setCardInput] = useState('')
+  const [isRuleFormOpen, setIsRuleFormOpen] = useState(false)
+  const [ruleDraft, setRuleDraft] = useState({ category: categories[0], rule: '' })
+  const [brakeConfirmed, setBrakeConfirmed] = useState(false)
+  const [isInvestmentCheck, setIsInvestmentCheck] = useState(false)
+  const [noAlternativeCheck, setNoAlternativeCheck] = useState(false)
+  const [incomeDraft, setIncomeDraft] = useState({ name: '', currentAmount: '', projectedAmount: '', memo: '' })
+  const [editingIncomeId, setEditingIncomeId] = useState<string | null>(null)
+  const [isIncomeFormOpen, setIsIncomeFormOpen] = useState(false)
+  const [loanDraftAprType, setLoanDraftAprType] = useState<'annual' | 'total'>('annual')
   const [expandedLoanIds, setExpandedLoanIds] = useState<Set<string>>(new Set())
   const [expandedFixedIds, setExpandedFixedIds] = useState<Set<string>>(new Set())
 
@@ -421,12 +485,13 @@ function App() {
       targetAmount: clampPositive(Number(savingsDraft.targetAmount)),
       savedAmount: clampPositive(Number(savingsDraft.savedAmount)),
       memo: savingsDraft.memo.trim(),
+      level: savingsDraft.level,
     }
     setData((current) => ({
       ...current,
       savingsGoals: [...(current.savingsGoals ?? []), goal],
     }))
-    setSavingsDraft({ name: '', monthlyTarget: '', targetAmount: '', savedAmount: '', memo: '' })
+    setSavingsDraft({ name: '', monthlyTarget: '', targetAmount: '', savedAmount: '', memo: '', level: 'short' })
   }
 
   function updateSavingsGoal(id: string, patch: Partial<SavingsGoal>) {
@@ -444,6 +509,47 @@ function App() {
       savingsGoals: (current.savingsGoals ?? []).filter((g) => g.id !== id),
     }))
     if (editingSavingsId === id) setEditingSavingsId(null)
+  }
+
+  function addExpenseRule() {
+    if (!ruleDraft.rule.trim()) return
+    const newRule: ExpenseRule = { id: createId(), category: ruleDraft.category, rule: ruleDraft.rule.trim() }
+    setData((c) => ({ ...c, expenseRules: [...(c.expenseRules ?? []), newRule] }))
+    setRuleDraft({ category: categories[0], rule: '' })
+  }
+
+  function deleteExpenseRule(id: string) {
+    setData((c) => ({ ...c, expenseRules: (c.expenseRules ?? []).filter((r) => r.id !== id) }))
+  }
+
+  function addIncomeItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!incomeDraft.name.trim()) return
+    const item: IncomeItem = {
+      id: createId(),
+      name: incomeDraft.name.trim(),
+      currentAmount: clampPositive(Number(incomeDraft.currentAmount)),
+      projectedAmount: clampPositive(Number(incomeDraft.projectedAmount)),
+      memo: incomeDraft.memo.trim(),
+      updatedAt: todayValue(),
+    }
+    setData((c) => ({ ...c, incomeItems: [...(c.incomeItems ?? []), item] }))
+    setIncomeDraft({ name: '', currentAmount: '', projectedAmount: '', memo: '' })
+    setIsIncomeFormOpen(false)
+  }
+
+  function updateIncomeItem(id: string, patch: Partial<IncomeItem>) {
+    setData((c) => ({
+      ...c,
+      incomeItems: (c.incomeItems ?? []).map((item) =>
+        item.id === id ? { ...item, ...patch, updatedAt: todayValue() } : item,
+      ),
+    }))
+  }
+
+  function deleteIncomeItem(id: string) {
+    setData((c) => ({ ...c, incomeItems: (c.incomeItems ?? []).filter((item) => item.id !== id) }))
+    if (editingIncomeId === id) setEditingIncomeId(null)
   }
 
   function moveSavingsGoal(id: string, direction: 'up' | 'down') {
@@ -541,6 +647,42 @@ function App() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 8)
 
+  const prevMonth = addMonths(selectedMonth, -1)
+  const prevMonthExpenses = useMemo(
+    () => data.expenses.filter((e) => e.date.startsWith(prevMonth)),
+    [data.expenses, prevMonth],
+  )
+  const prevMonthTotal = prevMonthExpenses.reduce((s, e) => s + e.amount, 0)
+  const monthDiff = totals.variableSpent - prevMonthTotal
+
+  const selectedYear = selectedMonth.slice(0, 4)
+  const annualMonthlyTotals = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const m = `${selectedYear}-${String(i + 1).padStart(2, '0')}`
+      return { month: m, label: `${i + 1}月`, total: data.expenses.filter((e) => e.date.startsWith(m)).reduce((s, e) => s + e.amount, 0) }
+    })
+  }, [data.expenses, selectedYear])
+
+  const annualCategoryTotals = useMemo(() => {
+    const yearExpenses = data.expenses.filter((e) => e.date.startsWith(selectedYear))
+    const map: Record<string, number> = {}
+    for (const e of yearExpenses) map[e.category] = (map[e.category] ?? 0) + e.amount
+    const total = Object.values(map).reduce((s, v) => s + v, 0)
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat, amt]) => ({ cat, amt, pct: total > 0 ? Math.round((amt / total) * 100) : 0 }))
+  }, [data.expenses, selectedYear])
+
+  const allPaymentMethods = useMemo(
+    () => [...paymentMethods, ...(data.settings.paymentCards ?? [])],
+    [data.settings.paymentCards],
+  )
+
+  const activeRule = useMemo(
+    () => (data.expenseRules ?? []).find((r) => r.category === expenseDraft.category) ?? null,
+    [data.expenseRules, expenseDraft.category],
+  )
+
   function updateSettings(nextSettings: Partial<Settings>) {
     setData((current) => ({
       ...current,
@@ -584,6 +726,9 @@ function App() {
       memo: '',
       date: `${selectedMonth}-01`,
     }))
+    setBrakeConfirmed(false)
+    setIsInvestmentCheck(false)
+    setNoAlternativeCheck(false)
   }
 
   function addFixedCost(event: FormEvent<HTMLFormElement>) {
@@ -600,6 +745,9 @@ function App() {
       loanId: fixedDraft.loanId || undefined,
       active: true,
       fundedMonths: [],
+      genre: fixedDraft.genre,
+      isInvestment: false,
+      noAlternative: false,
     }
 
     setData((current) => ({
@@ -612,6 +760,7 @@ function App() {
       dueDay: '1',
       method: paymentMethods[0],
       loanId: '',
+      genre: 'その他',
     })
   }
 
@@ -630,6 +779,7 @@ function App() {
       monthlyPayment: monthlyPayment > 0 ? monthlyPayment : 0,
       extraPayment: Number(loanDraft.extraPayment) || 0,
       apr: Number(loanDraft.apr) || 0,
+      aprType: loanDraftAprType,
       kind: loanDraft.kind,
       totalPayments: Number(loanDraft.totalPayments) || 0,
       paymentHistory: [],
@@ -991,6 +1141,7 @@ function App() {
                   type="number"
                   min="0"
                   value={data.settings.monthlyIncome || ''}
+                  onFocus={(e) => e.target.select()}
                   onChange={(event) =>
                     updateSettings({ monthlyIncome: Number(event.target.value) })
                   }
@@ -1004,12 +1155,66 @@ function App() {
                   type="number"
                   min="0"
                   value={data.settings.bufferTarget || ''}
+                  onFocus={(e) => e.target.select()}
                   onChange={(event) =>
                     updateSettings({ bufferTarget: Number(event.target.value) })
                   }
                   placeholder="10000"
                 />
               </label>
+            </div>
+
+            {/* ── クレジットカード登録 ── */}
+            <div className="import-panel" style={{ marginTop: 12 }}>
+              <h3 style={{ margin: 0 }}>クレジットカード登録</h3>
+              <div className="inline-fields" style={{ alignItems: 'end' }}>
+                <label>
+                  <span>カード名</span>
+                  <input
+                    type="text"
+                    placeholder="例：楽天カード"
+                    value={cardInput}
+                    onChange={(e) => setCardInput(e.target.value)}
+                  />
+                </label>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  style={{ alignSelf: 'end' }}
+                  disabled={!cardInput.trim()}
+                  onClick={() => {
+                    const name = cardInput.trim()
+                    if (!name) return
+                    updateSettings({ paymentCards: [...(data.settings.paymentCards ?? []), name] })
+                    setCardInput('')
+                  }}
+                >
+                  <Plus size={15} />
+                  追加
+                </button>
+              </div>
+              {(data.settings.paymentCards ?? []).length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {(data.settings.paymentCards ?? []).map((card, i) => (
+                    <span key={i} className="card-chip">
+                      {card}
+                      <button
+                        type="button"
+                        className="icon-button subtle"
+                        style={{ width: 20, height: 20, marginLeft: 2 }}
+                        onClick={() =>
+                          updateSettings({
+                            paymentCards: (data.settings.paymentCards ?? []).filter((_, j) => j !== i),
+                          })
+                        }
+                        aria-label="削除"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="breakdown">
@@ -1047,6 +1252,72 @@ function App() {
                 </strong>
               </div>
             </div>
+
+            {/* ── 先月比較 ── */}
+            <div className="focus-strip" style={{ marginTop: 12 }}>
+              <div>
+                <span>{monthLabel(prevMonth)}支出</span>
+                <strong>{yen(prevMonthTotal)}</strong>
+              </div>
+              <div>
+                <span>先月比</span>
+                <strong style={{ color: monthDiff > 0 ? 'var(--danger)' : monthDiff < 0 ? 'var(--green)' : 'var(--ink)' }}>
+                  {monthDiff > 0 ? `+${yen(monthDiff)}` : monthDiff < 0 ? yen(monthDiff) : '±0'}
+                </strong>
+              </div>
+            </div>
+
+            {/* ── 年間グラフ ── */}
+            <div className="list-block" style={{ marginTop: 16 }}>
+              <div className="list-heading">
+                <h3>{selectedYear}年の月別支出</h3>
+              </div>
+              {(() => {
+                const maxVal = Math.max(...annualMonthlyTotals.map((m) => m.total), 1)
+                return (
+                  <div className="annual-chart-wrap">
+                    {annualMonthlyTotals.map((m) => {
+                      const barH = Math.round((m.total / maxVal) * 80)
+                      const isSelected = m.month === selectedMonth
+                      return (
+                        <div key={m.month} className="annual-chart-col" onClick={() => changeSelectedMonth(m.month)} style={{ cursor: 'pointer' }}>
+                          <span className="annual-chart-label">{yen(m.total)}</span>
+                          <div className="annual-chart-bar-wrap">
+                            <div
+                              className={`annual-chart-bar${isSelected ? ' selected' : ''}`}
+                              style={{ height: `${barH}px` }}
+                            />
+                          </div>
+                          <span className="annual-chart-month">{m.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* ── カテゴリ内訳 ── */}
+            {annualCategoryTotals.length > 0 && (
+              <div className="list-block" style={{ marginTop: 12 }}>
+                <div className="list-heading">
+                  <h3>{selectedYear}年カテゴリ別</h3>
+                </div>
+                <ul className="item-list">
+                  {annualCategoryTotals.map(({ cat, amt, pct }) => (
+                    <li key={cat} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 750, fontSize: 13, color: 'var(--ink)' }}>{cat}</span>
+                        <span style={{ fontSize: 13, color: 'var(--muted)' }}>{yen(amt)}（{pct}%）</span>
+                      </div>
+                      <div className="savings-progress-bar">
+                        <div className="savings-progress-fill" style={{ width: `${pct}%`, background: 'var(--blue)' }} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
 
           <section
@@ -1070,6 +1341,7 @@ function App() {
                   type="number"
                   min="0"
                   value={expenseDraft.amount}
+                  onFocus={(e) => e.target.select()}
                   onChange={(event) =>
                     setExpenseDraft((current) => ({
                       ...current,
@@ -1097,6 +1369,16 @@ function App() {
                 ))}
               </div>
 
+              {activeRule && (
+                <div className="rule-warning">
+                  <span className="rule-warning-icon">⚠️</span>
+                  <div>
+                    <strong>支出ブレーキ：{activeRule.category}</strong>
+                    <p>{activeRule.rule}</p>
+                  </div>
+                </div>
+              )}
+
               <label>
                 <span>支払い方法</span>
                 <select
@@ -1108,7 +1390,7 @@ function App() {
                     }))
                   }
                 >
-                  {paymentMethods.map((method) => (
+                  {allPaymentMethods.map((method) => (
                     <option key={method}>{method}</option>
                   ))}
                 </select>
@@ -1143,11 +1425,110 @@ function App() {
                 </label>
               </div>
 
-              <button className="primary-button" type="submit">
+              {activeRule && (
+                <div className="brake-checks">
+                  <label className="check-label">
+                    <input
+                      type="checkbox"
+                      checked={brakeConfirmed}
+                      onChange={(e) => setBrakeConfirmed(e.target.checked)}
+                    />
+                    <span>ブレーキを確認した上で登録する</span>
+                  </label>
+                  <label className="check-label">
+                    <input
+                      type="checkbox"
+                      checked={isInvestmentCheck}
+                      onChange={(e) => setIsInvestmentCheck(e.target.checked)}
+                    />
+                    <span>これは投資・自己成長のための支出</span>
+                  </label>
+                  <label className="check-label">
+                    <input
+                      type="checkbox"
+                      checked={noAlternativeCheck}
+                      onChange={(e) => setNoAlternativeCheck(e.target.checked)}
+                    />
+                    <span>代替手段がなく避けられない支出</span>
+                  </label>
+                </div>
+              )}
+
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={!!(activeRule && !brakeConfirmed)}
+              >
                 <Plus size={18} />
                 登録
               </button>
             </form>
+
+            {/* ── 支出ルール管理 ── */}
+            <div style={{ marginTop: 16 }}>
+              <button
+                className="strategy-add-toggle"
+                type="button"
+                style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 12 }}
+                onClick={() => setIsRuleFormOpen((v) => !v)}
+              >
+                <ShieldCheck size={15} />
+                {isRuleFormOpen ? '閉じる' : `支出ブレーキ設定（${(data.expenseRules ?? []).length}件）`}
+              </button>
+              {isRuleFormOpen && (
+                <div className="strategy-form" style={{ marginTop: 8 }}>
+                  <div className="inline-fields" style={{ alignItems: 'end' }}>
+                    <label>
+                      <span>カテゴリ</span>
+                      <select
+                        value={ruleDraft.category}
+                        onChange={(e) => setRuleDraft((d) => ({ ...d, category: e.target.value }))}
+                      >
+                        {categories.map((c) => <option key={c}>{c}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      <span>ルール文</span>
+                      <input
+                        type="text"
+                        placeholder="例：月3回まで"
+                        value={ruleDraft.rule}
+                        onChange={(e) => setRuleDraft((d) => ({ ...d, rule: e.target.value }))}
+                      />
+                    </label>
+                  </div>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={addExpenseRule}
+                    disabled={!ruleDraft.rule.trim()}
+                  >
+                    <Plus size={15} />
+                    ルールを追加
+                  </button>
+                  {(data.expenseRules ?? []).length > 0 && (
+                    <ul className="item-list" style={{ marginTop: 4 }}>
+                      {(data.expenseRules ?? []).map((r) => (
+                        <li key={r.id} style={{ justifyContent: 'space-between' }}>
+                          <div>
+                            <span style={{ fontWeight: 750, fontSize: 13, color: 'var(--ink)' }}>{r.category}</span>
+                            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--muted)' }}>{r.rule}</p>
+                          </div>
+                          <button
+                            className="icon-button subtle"
+                            type="button"
+                            onClick={() => deleteExpenseRule(r.id)}
+                            aria-label="削除"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="list-block">
               <div className="list-heading">
@@ -1265,7 +1646,7 @@ function App() {
             </div>
 
             {/* ── TOP：合計サマリー ── */}
-            <div className="focus-strip cols-3" style={{ marginBottom: 16 }}>
+            <div className="focus-strip cols-3" style={{ marginBottom: 8 }}>
               <div>
                 <span>目標総額</span>
                 <strong>{yen((data.savingsGoals ?? []).reduce((s, g) => s + g.targetAmount, 0))}</strong>
@@ -1278,6 +1659,22 @@ function App() {
                 <span>貯金済み合計</span>
                 <strong style={{ color: 'var(--green)' }}>{yen((data.savingsGoals ?? []).reduce((s, g) => s + g.savedAmount, 0))}</strong>
               </div>
+            </div>
+
+            {/* ── 3段階サマリー ── */}
+            <div className="stage-summary-row">
+              {(['short', 'mid', 'final'] as const).map((lv) => {
+                const goals = (data.savingsGoals ?? []).filter((g) => g.level === lv)
+                const saved = goals.reduce((s, g) => s + g.savedAmount, 0)
+                const target = goals.reduce((s, g) => s + g.targetAmount, 0)
+                return (
+                  <div key={lv} className={`stage-card stage-${lv}`}>
+                    <span className="stage-label">{stageLabelMap[lv]}目標</span>
+                    <strong>{yen(saved)}</strong>
+                    <small>/ {yen(target)}</small>
+                  </div>
+                )
+              })}
             </div>
 
             {/* ── MIDDLE：目標一覧 ── */}
@@ -1310,11 +1707,23 @@ function App() {
                               />
                             </label>
                             <label className="mini-field">
+                              <span>段階</span>
+                              <select
+                                value={goal.level ?? 'short'}
+                                onChange={(e) => updateSavingsGoal(goal.id, { level: e.target.value as 'short' | 'mid' | 'final' })}
+                              >
+                                <option value="short">直近目標</option>
+                                <option value="mid">中期目標</option>
+                                <option value="final">最終目標</option>
+                              </select>
+                            </label>
+                            <label className="mini-field">
                               <span>月の貯金希望額</span>
                               <input
                                 type="number"
                                 min="0"
                                 value={goal.monthlyTarget}
+                                onFocus={(e) => e.target.select()}
                                 onChange={(e) => updateSavingsGoal(goal.id, { monthlyTarget: clampPositive(Number(e.target.value)) })}
                               />
                             </label>
@@ -1324,6 +1733,7 @@ function App() {
                                 type="number"
                                 min="0"
                                 value={goal.targetAmount}
+                                onFocus={(e) => e.target.select()}
                                 onChange={(e) => updateSavingsGoal(goal.id, { targetAmount: clampPositive(Number(e.target.value)) })}
                               />
                             </label>
@@ -1333,6 +1743,7 @@ function App() {
                                 type="number"
                                 min="0"
                                 value={goal.savedAmount}
+                                onFocus={(e) => e.target.select()}
                                 onChange={(e) => updateSavingsGoal(goal.id, { savedAmount: clampPositive(Number(e.target.value)) })}
                               />
                             </label>
@@ -1389,7 +1800,12 @@ function App() {
                               </button>
                             </div>
                             <div className="item-main">
-                              <span>{goal.name}</span>
+                              <span>
+                                {goal.name}
+                                <span className={`stage-badge stage-badge-${goal.level ?? 'short'}`}>
+                                  {stageLabelMap[goal.level ?? 'short']}
+                                </span>
+                              </span>
                               {goal.memo && <small>{goal.memo}</small>}
                               {goal.monthlyTarget > 0 && (
                                 <small style={{ color: 'var(--muted)' }}>月の希望額：{yen(goal.monthlyTarget)}</small>
@@ -1446,12 +1862,24 @@ function App() {
                       />
                     </label>
                     <label>
+                      <span>段階</span>
+                      <select
+                        value={savingsDraft.level}
+                        onChange={(e) => setSavingsDraft((d) => ({ ...d, level: e.target.value as 'short' | 'mid' | 'final' }))}
+                      >
+                        <option value="short">直近目標</option>
+                        <option value="mid">中期目標</option>
+                        <option value="final">最終目標</option>
+                      </select>
+                    </label>
+                    <label>
                       <span>月の貯金希望額</span>
                       <input
                         type="number"
                         min="0"
                         placeholder="0"
                         value={savingsDraft.monthlyTarget}
+                        onFocus={(e) => e.target.select()}
                         onChange={(e) => setSavingsDraft((d) => ({ ...d, monthlyTarget: e.target.value }))}
                       />
                     </label>
@@ -1462,6 +1890,7 @@ function App() {
                         min="0"
                         placeholder="0"
                         value={savingsDraft.targetAmount}
+                        onFocus={(e) => e.target.select()}
                         onChange={(e) => setSavingsDraft((d) => ({ ...d, targetAmount: e.target.value }))}
                       />
                     </label>
@@ -1472,6 +1901,7 @@ function App() {
                         min="0"
                         placeholder="0"
                         value={savingsDraft.savedAmount}
+                        onFocus={(e) => e.target.select()}
                         onChange={(e) => setSavingsDraft((d) => ({ ...d, savedAmount: e.target.value }))}
                       />
                     </label>
@@ -1489,6 +1919,181 @@ function App() {
                     className="primary-button"
                     type="submit"
                     disabled={!savingsDraft.name.trim()}
+                  >
+                    <Plus size={16} />
+                    追加する
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {/* ── 収益化・副収入管理 ── */}
+            <div className="list-block" style={{ marginTop: 24 }}>
+              <div className="panel-heading" style={{ marginBottom: 12 }}>
+                <div>
+                  <p className="eyebrow">Side Income</p>
+                  <h2 style={{ fontSize: 18 }}>収益化・副収入</h2>
+                </div>
+                <CircleDollarSign size={20} />
+              </div>
+
+              {(data.incomeItems ?? []).length > 0 && (
+                <ul className="item-list" style={{ marginBottom: 12 }}>
+                  {(data.incomeItems ?? []).map((item) => {
+                    const diff = item.projectedAmount - item.currentAmount
+                    const isEditingItem = editingIncomeId === item.id
+                    return (
+                      <li key={item.id} className="stacked-item">
+                        {isEditingItem ? (
+                          <div className="edit-grid" style={{ width: '100%' }}>
+                            <label className="mini-field">
+                              <span>名前</span>
+                              <input
+                                type="text"
+                                value={item.name}
+                                onChange={(e) => updateIncomeItem(item.id, { name: e.target.value })}
+                              />
+                            </label>
+                            <label className="mini-field">
+                              <span>現在の収入額</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.currentAmount}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => updateIncomeItem(item.id, { currentAmount: clampPositive(Number(e.target.value)) })}
+                              />
+                            </label>
+                            <label className="mini-field">
+                              <span>来月の目標額</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.projectedAmount}
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => updateIncomeItem(item.id, { projectedAmount: clampPositive(Number(e.target.value)) })}
+                              />
+                            </label>
+                            <label className="mini-field full-span">
+                              <span>メモ・戦略</span>
+                              <input
+                                type="text"
+                                value={item.memo}
+                                onChange={(e) => updateIncomeItem(item.id, { memo: e.target.value })}
+                              />
+                            </label>
+                            <div className="full-span" style={{ display: 'flex', gap: 8 }}>
+                              <button
+                                className="primary-button"
+                                type="button"
+                                style={{ flex: 1 }}
+                                onClick={() => setEditingIncomeId(null)}
+                              >
+                                完了
+                              </button>
+                              <button
+                                className="icon-button subtle"
+                                type="button"
+                                onClick={() => deleteIncomeItem(item.id)}
+                                aria-label="削除"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="item-row">
+                            <div className="item-main">
+                              <span>{item.name}</span>
+                              {item.memo && <small>{item.memo}</small>}
+                              <div className="income-bar-wrap">
+                                <div className="income-bar-current" style={{ flex: item.currentAmount || 1 }} />
+                                {item.projectedAmount > item.currentAmount && (
+                                  <div className="income-bar-projected" style={{ flex: item.projectedAmount - item.currentAmount }} />
+                                )}
+                              </div>
+                              <small style={{ color: 'var(--green)', fontWeight: 750 }}>
+                                現在 {yen(item.currentAmount)}
+                                {item.projectedAmount > 0 && (
+                                  <span style={{ color: diff >= 0 ? 'var(--green)' : 'var(--danger)', marginLeft: 8 }}>
+                                    → 来月目標 {yen(item.projectedAmount)}（{diff >= 0 ? '+' : ''}{yen(diff)}）
+                                  </span>
+                                )}
+                              </small>
+                              <small style={{ color: 'var(--muted)' }}>更新：{item.updatedAt}</small>
+                            </div>
+                            <button
+                              className="icon-button subtle"
+                              type="button"
+                              onClick={() => setEditingIncomeId(item.id)}
+                              aria-label="編集"
+                            >
+                              <ChevronDown size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+
+              <button
+                className="strategy-add-toggle"
+                type="button"
+                onClick={() => setIsIncomeFormOpen((v) => !v)}
+              >
+                <Plus size={16} style={{ transform: isIncomeFormOpen ? 'rotate(45deg)' : 'none', transition: 'transform 0.2s' }} />
+                {isIncomeFormOpen ? '閉じる' : '収入源を追加'}
+              </button>
+              {isIncomeFormOpen && (
+                <form className="strategy-form" style={{ marginTop: 10 }} onSubmit={addIncomeItem}>
+                  <div className="settings-grid">
+                    <label>
+                      <span>名前</span>
+                      <input
+                        type="text"
+                        placeholder="例：ブログ、メルカリ"
+                        value={incomeDraft.name}
+                        onChange={(e) => setIncomeDraft((d) => ({ ...d, name: e.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      <span>現在の収入額</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={incomeDraft.currentAmount}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setIncomeDraft((d) => ({ ...d, currentAmount: e.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      <span>来月の目標額</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={incomeDraft.projectedAmount}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setIncomeDraft((d) => ({ ...d, projectedAmount: e.target.value }))}
+                      />
+                    </label>
+                    <label className="full-span">
+                      <span>メモ・戦略</span>
+                      <input
+                        type="text"
+                        placeholder="どう伸ばすか"
+                        value={incomeDraft.memo}
+                        onChange={(e) => setIncomeDraft((d) => ({ ...d, memo: e.target.value }))}
+                      />
+                    </label>
+                  </div>
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    disabled={!incomeDraft.name.trim()}
                   >
                     <Plus size={16} />
                     追加する
@@ -1578,6 +2183,20 @@ function App() {
                     </select>
                   </label>
                   <label>
+                    <span>ジャンル</span>
+                    <select
+                      value={fixedDraft.genre}
+                      onChange={(event) =>
+                        setFixedDraft((current) => ({
+                          ...current,
+                          genre: event.target.value,
+                        }))
+                      }
+                    >
+                      {fixedGenres.map((g) => <option key={g}>{g}</option>)}
+                    </select>
+                  </label>
+                  <label>
                     <span>関連ローン</span>
                     <select
                       value={fixedDraft.loanId}
@@ -1618,155 +2237,167 @@ function App() {
                   </div>
                 </div>
 
-                <ul className="item-list plan-list">
-                  {data.fixedCosts.map((cost) => {
-                    const relatedLoan = data.loans.find(
-                      (loan) => loan.id === cost.loanId,
-                    )
-
-                    const isFixedExpanded = expandedFixedIds.has(cost.id)
-                    const isFixedFunded = cost.fundedMonths.includes(selectedMonth)
-
-                    return (
-                      <li key={cost.id} className="stacked-item">
-                        <div className="item-row">
-                          <button
-                            className="check-button"
-                            type="button"
-                            onClick={() => toggleFixedCost(cost.id)}
-                            aria-label="固定費の有効状態を切り替え"
-                            title="有効状態を切り替え"
-                          >
-                            {cost.active ? (
-                              <CheckCircle2 size={19} />
-                            ) : (
-                              <CircleDollarSign size={19} />
-                            )}
-                          </button>
-                          <button
-                            className={isFixedFunded ? 'check-button funded-button active' : 'check-button funded-button'}
-                            type="button"
-                            onClick={() => toggleFixedFunded(cost.id)}
-                            aria-label={isFixedFunded ? '充当済み（取り消し）' : '今月は充当済みにする'}
-                            title={isFixedFunded ? '充当済み：今月の収支から除外中（クリックで取り消し）' : '充当済み：今月の収支計算から除外する'}
-                          >
-                            <PiggyBank size={17} />
-                          </button>
-                          <div className="item-main">
-                            <span>
-                              {cost.name}
-                              {isFixedFunded ? <span className="funded-badge">充当済み</span> : null}
-                            </span>
-                            <strong className={isFixedFunded ? 'muted-text' : ''}>
-                              {yen(cost.amount)}
-                            </strong>
-                            <small>
-                              毎月{cost.dueDay}日 / {cost.method}
-                              {relatedLoan ? ` / ${relatedLoan.name}` : ''}
-                            </small>
-                          </div>
-                          <button
-                            className="icon-button subtle"
-                            type="button"
-                            onClick={() => toggleFixedExpanded(cost.id)}
-                            aria-label={isFixedExpanded ? '折りたたむ' : '編集する'}
-                            title={isFixedExpanded ? '折りたたむ' : '編集する'}
-                          >
-                            <ChevronDown
-                              size={17}
-                              style={{
-                                transform: isFixedExpanded ? 'rotate(180deg)' : 'none',
-                                transition: 'transform 0.2s',
-                              }}
-                            />
-                          </button>
-                          <button
-                            className="icon-button subtle"
-                            type="button"
-                            onClick={() => deleteFixedCost(cost.id)}
-                            aria-label="固定費を削除"
-                            title="固定費を削除"
-                          >
-                            <Trash2 size={17} />
-                          </button>
+                {(() => {
+                  const grouped: Record<string, typeof data.fixedCosts> = {}
+                  for (const cost of data.fixedCosts) {
+                    const g = cost.genre || 'その他'
+                    if (!grouped[g]) grouped[g] = []
+                    grouped[g].push(cost)
+                  }
+                  const orderedGenres = fixedGenres.filter((g) => grouped[g]?.length > 0)
+                  return (
+                    <div className="item-list plan-list" style={{ gap: 12 }}>
+                      {orderedGenres.map((genre) => (
+                        <div key={genre}>
+                          <div className="genre-header">{genre}</div>
+                          <ul className="item-list" style={{ gap: 6 }}>
+                            {grouped[genre].map((cost) => {
+                              const relatedLoan = data.loans.find((loan) => loan.id === cost.loanId)
+                              const isFixedExpanded = expandedFixedIds.has(cost.id)
+                              const isFixedFunded = cost.fundedMonths.includes(selectedMonth)
+                              return (
+                                <li key={cost.id} className="stacked-item">
+                                  <div className="item-row">
+                                    <button
+                                      className="check-button"
+                                      type="button"
+                                      onClick={() => toggleFixedCost(cost.id)}
+                                      aria-label="固定費の有効状態を切り替え"
+                                      title="有効状態を切り替え"
+                                    >
+                                      {cost.active ? <CheckCircle2 size={19} /> : <CircleDollarSign size={19} />}
+                                    </button>
+                                    <button
+                                      className={isFixedFunded ? 'check-button funded-button active' : 'check-button funded-button'}
+                                      type="button"
+                                      onClick={() => toggleFixedFunded(cost.id)}
+                                      aria-label={isFixedFunded ? '充当済み（取り消し）' : '今月は充当済みにする'}
+                                      title={isFixedFunded ? '充当済み：今月の収支から除外中（クリックで取り消し）' : '充当済み：今月の収支計算から除外する'}
+                                    >
+                                      <PiggyBank size={17} />
+                                    </button>
+                                    <div className="item-main">
+                                      <span>
+                                        {cost.name}
+                                        {isFixedFunded ? <span className="funded-badge">充当済み</span> : null}
+                                        {cost.isInvestment ? <span className="invest-badge">投資</span> : null}
+                                        {cost.noAlternative ? <span className="invest-badge" style={{ background: '#f0e8ff', borderColor: '#c4a0f0', color: '#5b2da0' }}>代替不可</span> : null}
+                                      </span>
+                                      <strong className={isFixedFunded ? 'muted-text' : ''}>{yen(cost.amount)}</strong>
+                                      <small>
+                                        毎月{cost.dueDay}日 / {cost.method}
+                                        {relatedLoan ? ` / ${relatedLoan.name}` : ''}
+                                      </small>
+                                    </div>
+                                    <button
+                                      className="icon-button subtle"
+                                      type="button"
+                                      onClick={() => toggleFixedExpanded(cost.id)}
+                                      aria-label={isFixedExpanded ? '折りたたむ' : '編集する'}
+                                    >
+                                      <ChevronDown size={17} style={{ transform: isFixedExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                                    </button>
+                                    <button
+                                      className="icon-button subtle"
+                                      type="button"
+                                      onClick={() => deleteFixedCost(cost.id)}
+                                      aria-label="固定費を削除"
+                                    >
+                                      <Trash2 size={17} />
+                                    </button>
+                                  </div>
+                                  {isFixedExpanded && (
+                                    <div className="edit-grid">
+                                      <label className="mini-field">
+                                        <span>名前</span>
+                                        <input
+                                          value={cost.name}
+                                          onChange={(event) => updateFixedCost(cost.id, { name: event.target.value })}
+                                        />
+                                      </label>
+                                      <label className="mini-field">
+                                        <span>ジャンル</span>
+                                        <select
+                                          value={cost.genre || 'その他'}
+                                          onChange={(event) => updateFixedCost(cost.id, { genre: event.target.value })}
+                                        >
+                                          {fixedGenres.map((g) => <option key={g}>{g}</option>)}
+                                        </select>
+                                      </label>
+                                      <label className="mini-field">
+                                        <span>金額</span>
+                                        <input
+                                          inputMode="numeric"
+                                          type="number"
+                                          min="0"
+                                          value={cost.amount || ''}
+                                          onFocus={(e) => e.target.select()}
+                                          onChange={(event) => updateFixedCost(cost.id, { amount: Number(event.target.value) })}
+                                        />
+                                      </label>
+                                      <label className="mini-field">
+                                        <span>支払日</span>
+                                        <input
+                                          inputMode="numeric"
+                                          type="number"
+                                          min="1"
+                                          max="31"
+                                          value={cost.dueDay}
+                                          onFocus={(e) => e.target.select()}
+                                          onChange={(event) => updateFixedCost(cost.id, { dueDay: Number(event.target.value) })}
+                                        />
+                                      </label>
+                                      <label className="mini-field">
+                                        <span>支払い方法</span>
+                                        <select
+                                          value={cost.method}
+                                          onChange={(event) => updateFixedCost(cost.id, { method: event.target.value })}
+                                        >
+                                          {allPaymentMethods.map((method) => <option key={method}>{method}</option>)}
+                                        </select>
+                                      </label>
+                                      <label className="mini-field">
+                                        <span>関連ローン</span>
+                                        <select
+                                          value={cost.loanId ?? ''}
+                                          onChange={(event) => updateFixedCostLoan(cost.id, event.target.value)}
+                                        >
+                                          <option value="">なし</option>
+                                          {data.loans.map((loan) => <option key={loan.id} value={loan.id}>{loan.name}</option>)}
+                                        </select>
+                                      </label>
+                                      <div className="full-span" style={{ display: 'flex', gap: 12 }}>
+                                        <label className="check-label" style={{ flex: 1 }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={cost.isInvestment ?? false}
+                                            onChange={(e) => updateFixedCost(cost.id, { isInvestment: e.target.checked })}
+                                          />
+                                          <span>投資・自己成長</span>
+                                        </label>
+                                        <label className="check-label" style={{ flex: 1 }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={cost.noAlternative ?? false}
+                                            onChange={(e) => updateFixedCost(cost.id, { noAlternative: e.target.checked })}
+                                          />
+                                          <span>代替手段なし</span>
+                                        </label>
+                                      </div>
+                                    </div>
+                                  )}
+                                </li>
+                              )
+                            })}
+                          </ul>
                         </div>
-                        {isFixedExpanded && <div className="edit-grid">
-                          <label className="mini-field">
-                            <span>名前</span>
-                            <input
-                              value={cost.name}
-                              onChange={(event) =>
-                                updateFixedCost(cost.id, {
-                                  name: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-                          <label className="mini-field">
-                            <span>金額</span>
-                            <input
-                              inputMode="numeric"
-                              type="number"
-                              min="0"
-                              value={cost.amount || ''}
-                              onChange={(event) =>
-                                updateFixedCost(cost.id, {
-                                  amount: Number(event.target.value),
-                                })
-                              }
-                            />
-                          </label>
-                          <label className="mini-field">
-                            <span>支払日</span>
-                            <input
-                              inputMode="numeric"
-                              type="number"
-                              min="1"
-                              max="31"
-                              value={cost.dueDay}
-                              onChange={(event) =>
-                                updateFixedCost(cost.id, {
-                                  dueDay: Number(event.target.value),
-                                })
-                              }
-                            />
-                          </label>
-                          <label className="mini-field">
-                            <span>支払い方法</span>
-                            <select
-                              value={cost.method}
-                              onChange={(event) =>
-                                updateFixedCost(cost.id, {
-                                  method: event.target.value,
-                                })
-                              }
-                            >
-                              {paymentMethods.map((method) => (
-                                <option key={method}>{method}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="mini-field full-span">
-                            <span>関連ローン</span>
-                            <select
-                              value={cost.loanId ?? ''}
-                              onChange={(event) =>
-                                updateFixedCostLoan(cost.id, event.target.value)
-                              }
-                            >
-                              <option value="">なし</option>
-                              {data.loans.map((loan) => (
-                                <option key={loan.id} value={loan.id}>
-                                  {loan.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>}
-                      </li>
-                    )
-                  })}
-                </ul>
+                      ))}
+                      {data.fixedCosts.length === 0 && (
+                        <p className="empty-text">固定費がまだありません</p>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
 
               <div>
@@ -1869,20 +2500,31 @@ function App() {
                       />
                     </label>
                     <label>
-                      <span>年率</span>
+                      <span>
+                        {loanDraftAprType === 'annual' ? '年率（%）' : '利子総額（円）'}
+                        <button
+                          type="button"
+                          className="apr-type-toggle"
+                          onClick={() => setLoanDraftAprType((t) => t === 'annual' ? 'total' : 'annual')}
+                          title="切り替え"
+                        >
+                          {loanDraftAprType === 'annual' ? '→ 総額入力に切替' : '→ 年率入力に切替'}
+                        </button>
+                      </span>
                       <input
                         inputMode="decimal"
                         type="number"
                         min="0"
-                        step="0.1"
+                        step={loanDraftAprType === 'annual' ? '0.1' : '1'}
                         value={loanDraft.apr}
+                        onFocus={(e) => e.target.select()}
                         onChange={(event) =>
                           setLoanDraft((current) => ({
                             ...current,
                             apr: event.target.value,
                           }))
                         }
-                        placeholder="18"
+                        placeholder={loanDraftAprType === 'annual' ? '18' : '30000'}
                       />
                     </label>
                   </div>
@@ -2045,6 +2687,7 @@ function App() {
                               type="number"
                               min="0"
                               value={loan.balance || ''}
+                              onFocus={(e) => e.target.select()}
                               onChange={(event) =>
                                 updateLoan(loan.id, {
                                   balance: Number(event.target.value),
@@ -2059,6 +2702,7 @@ function App() {
                               type="number"
                               min="0"
                               value={loan.fee || ''}
+                              onFocus={(e) => e.target.select()}
                               onChange={(event) =>
                                 updateLoan(loan.id, {
                                   fee: Number(event.target.value),
@@ -2074,6 +2718,7 @@ function App() {
                               type="number"
                               min="0"
                               value={loan.totalPayments || ''}
+                              onFocus={(e) => e.target.select()}
                               onChange={(event) =>
                                 updateLoan(loan.id, {
                                   totalPayments: Number(event.target.value),
@@ -2089,6 +2734,7 @@ function App() {
                               type="number"
                               min="0"
                               value={loan.monthlyPayment || ''}
+                              onFocus={(e) => e.target.select()}
                               onChange={(event) =>
                                 updateLoan(loan.id, {
                                   monthlyPayment: Number(event.target.value),
@@ -2103,6 +2749,7 @@ function App() {
                               type="number"
                               min="0"
                               value={loan.extraPayment || ''}
+                              onFocus={(e) => e.target.select()}
                               onChange={(event) =>
                                 updateLoan(loan.id, {
                                   extraPayment: Number(event.target.value),
@@ -2112,13 +2759,23 @@ function App() {
                             />
                           </label>
                           <label className="mini-field">
-                            <span>年率</span>
+                            <span>
+                              {loan.aprType === 'annual' ? '年率（%）' : '利子総額（円）'}
+                              <button
+                                type="button"
+                                className="apr-type-toggle"
+                                onClick={() => updateLoan(loan.id, { aprType: loan.aprType === 'annual' ? 'total' : 'annual' })}
+                              >
+                                {loan.aprType === 'annual' ? '→ 総額' : '→ 年率'}
+                              </button>
+                            </span>
                             <input
                               inputMode="decimal"
                               type="number"
                               min="0"
-                              step="0.1"
+                              step={loan.aprType === 'annual' ? '0.1' : '1'}
                               value={loan.apr || ''}
+                              onFocus={(e) => e.target.select()}
                               onChange={(event) =>
                                 updateLoan(loan.id, { apr: Number(event.target.value) })
                               }
