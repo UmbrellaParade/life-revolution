@@ -1690,7 +1690,7 @@ function App() {
                               />
                             </label>
                             <label className="mini-field">
-                              <span>トータル目標貯金額</span>
+                              <span>トータル目標月額貯金額</span>
                               <input
                                 type="number"
                                 min="0"
@@ -1862,7 +1862,7 @@ function App() {
                       />
                     </label>
                     <label>
-                      <span>トータル目標貯金額</span>
+                      <span>トータル目標月額貯金額</span>
                       <input
                         type="number"
                         min="0"
