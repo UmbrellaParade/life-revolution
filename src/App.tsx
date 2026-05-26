@@ -410,7 +410,6 @@ function App() {
   const [editingSavingsId, setEditingSavingsId] = useState<string | null>(null)
   const [isLoanTotalVisible, setIsLoanTotalVisible] = useState(false)
   const [isSavingsFormOpen, setIsSavingsFormOpen] = useState(false)
-  const [cardInput, setCardInput] = useState('')
   const [isRuleFormOpen, setIsRuleFormOpen] = useState(false)
   const [ruleDraft, setRuleDraft] = useState({ category: categories[0], rule: '' })
   const [brakeConfirmed, setBrakeConfirmed] = useState(false)
@@ -674,8 +673,8 @@ function App() {
   }, [data.expenses, selectedYear])
 
   const allPaymentMethods = useMemo(
-    () => [...paymentMethods, ...(data.settings.paymentCards ?? [])],
-    [data.settings.paymentCards],
+    () => [...paymentMethods, ...data.loans.map((l) => l.name).filter(Boolean)],
+    [data.loans],
   )
 
   const activeRule = useMemo(
@@ -1164,58 +1163,6 @@ function App() {
               </label>
             </div>
 
-            {/* ── クレジットカード登録 ── */}
-            <div className="import-panel" style={{ marginTop: 12 }}>
-              <h3 style={{ margin: 0 }}>クレジットカード登録</h3>
-              <div className="inline-fields" style={{ alignItems: 'end' }}>
-                <label>
-                  <span>カード名</span>
-                  <input
-                    type="text"
-                    placeholder="例：楽天カード"
-                    value={cardInput}
-                    onChange={(e) => setCardInput(e.target.value)}
-                  />
-                </label>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  style={{ alignSelf: 'end' }}
-                  disabled={!cardInput.trim()}
-                  onClick={() => {
-                    const name = cardInput.trim()
-                    if (!name) return
-                    updateSettings({ paymentCards: [...(data.settings.paymentCards ?? []), name] })
-                    setCardInput('')
-                  }}
-                >
-                  <Plus size={15} />
-                  追加
-                </button>
-              </div>
-              {(data.settings.paymentCards ?? []).length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {(data.settings.paymentCards ?? []).map((card, i) => (
-                    <span key={i} className="card-chip">
-                      {card}
-                      <button
-                        type="button"
-                        className="icon-button subtle"
-                        style={{ width: 20, height: 20, marginLeft: 2 }}
-                        onClick={() =>
-                          updateSettings({
-                            paymentCards: (data.settings.paymentCards ?? []).filter((_, j) => j !== i),
-                          })
-                        }
-                        aria-label="削除"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
 
             <div className="breakdown">
               <div>
