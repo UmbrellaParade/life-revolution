@@ -1200,7 +1200,7 @@ function App() {
 
             <div className="focus-strip">
               <div>
-                <span>返済ターゲット</span>
+                <span>返済集中ターゲット</span>
                 <select
                   value={data.settings.repaymentTarget}
                   onChange={(e) => updateSettings({ repaymentTarget: e.target.value })}
