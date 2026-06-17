@@ -3,6 +3,6 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: process.env.GITHUB_PAGES ? '/saving/' : '/',
+  base: process.env.GITHUB_PAGES ? '/life-revolution/' : '/',
   plugins: [react()],
 })
