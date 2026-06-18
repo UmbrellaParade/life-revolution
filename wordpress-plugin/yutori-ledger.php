@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution
  * Description: Adds the Umbrella Parade Life Revolution budgeting tool to WordPress with the [life_revolution] shortcode.
- * Version: 0.1.2
+ * Version: 0.1.3
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('YUTORI_LEDGER_VERSION', '0.1.2');
+define('YUTORI_LEDGER_VERSION', '0.1.3');
 define('YUTORI_LEDGER_PATH', plugin_dir_path(__FILE__));
 define('YUTORI_LEDGER_URL', plugin_dir_url(__FILE__));
 define('YUTORI_LEDGER_FRONTEND_PAGE_OPTION', 'life_revolution_frontend_page_id');
@@ -86,8 +86,6 @@ function yutori_ledger_script_loader_tag($tag, $handle, $src) {
 add_filter('script_loader_tag', 'yutori_ledger_script_loader_tag', 10, 3);
 
 function yutori_ledger_shortcode($atts = array()) {
-    yutori_ledger_enqueue_app();
-
     $atts = shortcode_atts(
         array(
             'class' => '',
@@ -95,6 +93,20 @@ function yutori_ledger_shortcode($atts = array()) {
         $atts,
         'yutori_ledger'
     );
+
+    if (!is_user_logged_in()) {
+        $redirect = get_permalink();
+        if (!$redirect) {
+            $redirect = home_url('/');
+        }
+
+        return '<div class="life-revolution-login-notice">'
+            . '<p>' . esc_html__('Life Revolutionはログイン中のユーザーだけが使えます。', 'life-revolution') . '</p>'
+            . '<p><a class="button button-primary" href="' . esc_url(wp_login_url($redirect)) . '">' . esc_html__('ログインして開く', 'life-revolution') . '</a></p>'
+            . '</div>';
+    }
+
+    yutori_ledger_enqueue_app();
 
     $extra_class = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $atts['class']);
     $classes = trim('life-revolution-root yutori-ledger-root ' . $extra_class);
@@ -130,11 +142,15 @@ function yutori_ledger_ensure_frontend_page($force = false): int {
     $existing = get_page_by_path('life-revolution');
     if ($existing instanceof WP_Post && $existing->post_status !== 'trash') {
         $page_id = (int) $existing->ID;
-        if ($force && !has_shortcode((string) $existing->post_content, 'life_revolution')) {
-            wp_update_post(array(
-                'ID' => $page_id,
-                'post_content' => trim((string) $existing->post_content) . "\n\n[life_revolution]",
-            ));
+        $updates = array('ID' => $page_id);
+        if (!has_shortcode((string) $existing->post_content, 'life_revolution')) {
+            $updates['post_content'] = trim((string) $existing->post_content) . "\n\n[life_revolution]";
+        }
+        if ($existing->post_status !== 'private') {
+            $updates['post_status'] = 'private';
+        }
+        if (count($updates) > 1 && ($force || isset($updates['post_status']))) {
+            wp_update_post($updates);
         }
         update_option(YUTORI_LEDGER_FRONTEND_PAGE_OPTION, $page_id, false);
         return $page_id;
@@ -142,7 +158,7 @@ function yutori_ledger_ensure_frontend_page($force = false): int {
 
     $page_id = wp_insert_post(array(
         'post_type' => 'page',
-        'post_status' => 'publish',
+        'post_status' => 'private',
         'post_title' => 'Life Revolution',
         'post_name' => 'life-revolution',
         'post_content' => '[life_revolution]',
@@ -216,7 +232,7 @@ function yutori_ledger_render_admin_page() {
     echo '<p>';
     if ($frontend_url !== '') {
         echo '<a class="button button-primary" href="' . esc_url($frontend_url) . '" target="_blank" rel="noopener">' . esc_html__('スマホ用ページを開く', 'life-revolution') . '</a> ';
-        echo '<span class="description">' . esc_html__('サイト側でLife Revolutionを開けます。スマホから使う時はこちらが便利です。', 'life-revolution') . '</span>';
+        echo '<span class="description">' . esc_html__('ログイン中のユーザーだけが開けるスマホ用ページです。', 'life-revolution') . '</span>';
     } else {
         echo '<a class="button button-primary" href="' . esc_url($create_page_url) . '">' . esc_html__('スマホ用ページを作成', 'life-revolution') . '</a> ';
         echo '<span class="description">' . esc_html__('固定ページ life-revolution に [life_revolution] を入れて作成します。', 'life-revolution') . '</span>';
