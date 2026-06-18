@@ -23,7 +23,7 @@ import {
   Trash2,
   WalletCards,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 
@@ -32,10 +32,18 @@ declare global {
     LifeRevolutionConfig?: {
       assetsUrl?: string
       enableServiceWorker?: boolean
+      restUrl?: string
+      nonce?: string
+      userId?: number
+      hasWordPressStorage?: boolean
     }
     YutoriLedgerConfig?: {
       assetsUrl?: string
       enableServiceWorker?: boolean
+      restUrl?: string
+      nonce?: string
+      userId?: number
+      hasWordPressStorage?: boolean
     }
   }
 }
@@ -148,8 +156,10 @@ type AppData = {
 }
 
 type TabId = 'dashboard' | 'expense' | 'savings' | 'plans' | 'strategy' | 'cards'
+type SyncStatus = 'loading' | 'local' | 'saving' | 'saved' | 'error'
 
 const storageKey = 'yutori-ledger-data-v1'
+const localUpdatedAtKey = 'life-revolution-local-updated-at-v1'
 
 function lifeRevolutionConfig() {
   return window.LifeRevolutionConfig ?? window.YutoriLedgerConfig
@@ -382,6 +392,25 @@ function normalizeData(importedData: Partial<AppData>): AppData {
   }
 }
 
+function hasMeaningfulData(value: Partial<AppData>) {
+  const settings: Partial<Settings> = value.settings ?? {}
+  return Boolean(
+    (value.expenses?.length ?? 0) > 0 ||
+      (value.fixedCosts?.length ?? 0) > 0 ||
+      (value.loans?.length ?? 0) > 0 ||
+      (value.strategyNotes?.length ?? 0) > 0 ||
+      (value.savingsGoals?.length ?? 0) > 0 ||
+      (value.expenseRules?.length ?? 0) > 0 ||
+      (value.incomeItems?.length ?? 0) > 0 ||
+      (value.cards?.length ?? 0) > 0 ||
+      Number(settings.monthlyIncome) > 0 ||
+      Number(settings.bufferTarget) > 0 ||
+      Number(settings.extraPayment) > 0 ||
+      Boolean(settings.repaymentTarget) ||
+      Number(settings.repaymentMonthlyTarget) > 0
+  )
+}
+
 function loadData(): AppData {
   try {
     const raw = localStorage.getItem(storageKey)
@@ -391,6 +420,79 @@ function loadData(): AppData {
   } catch {
     return defaultData
   }
+}
+
+function loadLocalUpdatedAt() {
+  try {
+    return localStorage.getItem(localUpdatedAtKey) || ''
+  } catch {
+    return ''
+  }
+}
+
+function markLocalUpdatedAt(value = new Date().toISOString()) {
+  try {
+    localStorage.setItem(localUpdatedAtKey, value)
+  } catch {
+    // localStorage can fail in private browsing modes; WordPress save still works.
+  }
+  return value
+}
+
+function wordpressStorageConfig() {
+  const config = lifeRevolutionConfig()
+  if (!config?.restUrl || !config?.nonce || !config.hasWordPressStorage) return null
+
+  return {
+    restUrl: config.restUrl.replace(/\/+$/, ''),
+    nonce: config.nonce,
+  }
+}
+
+async function fetchWordPressData() {
+  const config = wordpressStorageConfig()
+  if (!config) return null
+
+  const response = await fetch(`${config.restUrl}/state`, {
+    credentials: 'same-origin',
+    headers: {
+      'X-WP-Nonce': config.nonce,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`WordPress load failed: ${response.status}`)
+  }
+
+  return response.json() as Promise<{
+    data?: Partial<AppData> | null
+    hasData?: boolean
+    updatedAt?: string
+  }>
+}
+
+async function saveWordPressData(data: AppData) {
+  const config = wordpressStorageConfig()
+  if (!config) return null
+
+  const response = await fetch(`${config.restUrl}/state`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-WP-Nonce': config.nonce,
+    },
+    body: JSON.stringify({ data }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`WordPress save failed: ${response.status}`)
+  }
+
+  return response.json() as Promise<{
+    data?: Partial<AppData> | null
+    updatedAt?: string
+  }>
 }
 
 function estimateMonths(principal: number, monthlyPayment: number, apr: number) {
@@ -420,9 +522,20 @@ function projectBalance(loan: Loan, months: number) {
 }
 
 function App() {
+  const hasWordPressStorage = Boolean(wordpressStorageConfig())
   const [activeTab, setActiveTab] = useState<TabId>('expense')
   const [selectedMonth, setSelectedMonth] = useState(() => monthKey(new Date()))
   const [data, setData] = useState<AppData>(() => loadData())
+  const [isWordPressReady, setIsWordPressReady] = useState(!hasWordPressStorage)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(hasWordPressStorage ? 'loading' : 'local')
+  const [syncMessage, setSyncMessage] = useState(
+    hasWordPressStorage ? 'WordPressと同期準備中' : 'この端末に自動保存',
+  )
+  const initialDataRef = useRef(data)
+  const localWriteStartedRef = useRef(false)
+  const isApplyingRemoteRef = useRef(false)
+  const skipNextRemoteSaveRef = useRef(false)
+  const saveTimerRef = useRef<number | null>(null)
   const [expenseDraft, setExpenseDraft] = useState({
     amount: '',
     category: categories[0],
@@ -649,8 +762,118 @@ function App() {
   }
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(data))
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(data))
+    } catch {
+      // WordPress storage is the primary backup when it is available.
+    }
+
+    if (!localWriteStartedRef.current) {
+      localWriteStartedRef.current = true
+      return
+    }
+
+    if (isApplyingRemoteRef.current) {
+      isApplyingRemoteRef.current = false
+      return
+    }
+
+    markLocalUpdatedAt()
   }, [data])
+
+  useEffect(() => {
+    if (!hasWordPressStorage) return
+
+    let cancelled = false
+
+    async function syncInitialData() {
+      setSyncStatus('loading')
+      setSyncMessage('WordPressから読み込み中')
+
+      try {
+        const remoteState = await fetchWordPressData()
+        if (cancelled) return
+
+        const localData = initialDataRef.current
+        const localUpdatedAt = loadLocalUpdatedAt()
+        const remoteData = remoteState?.data ? normalizeData(remoteState.data) : null
+        const remoteUpdatedAt = remoteState?.updatedAt || ''
+        const localHasData = hasMeaningfulData(localData)
+        const remoteHasData = Boolean(remoteData && hasMeaningfulData(remoteData))
+        const shouldUseRemote =
+          remoteHasData &&
+          (!localHasData || !localUpdatedAt || (remoteUpdatedAt && remoteUpdatedAt >= localUpdatedAt))
+
+        if (remoteData && shouldUseRemote) {
+          isApplyingRemoteRef.current = true
+          skipNextRemoteSaveRef.current = true
+          setData(remoteData)
+          if (remoteUpdatedAt) markLocalUpdatedAt(remoteUpdatedAt)
+          setSyncStatus('saved')
+          setSyncMessage('WordPressから読み込み済み')
+        } else if (localHasData) {
+          const saved = await saveWordPressData(localData)
+          if (cancelled) return
+          if (saved?.updatedAt) markLocalUpdatedAt(saved.updatedAt)
+          skipNextRemoteSaveRef.current = true
+          setSyncStatus('saved')
+          setSyncMessage('WordPressに保存済み')
+        } else {
+          skipNextRemoteSaveRef.current = true
+          setSyncStatus('saved')
+          setSyncMessage('WordPressと同期済み')
+        }
+      } catch {
+        if (cancelled) return
+        skipNextRemoteSaveRef.current = true
+        setSyncStatus('error')
+        setSyncMessage('WordPress保存を確認できません')
+      } finally {
+        if (!cancelled) setIsWordPressReady(true)
+      }
+    }
+
+    void syncInitialData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [hasWordPressStorage])
+
+  useEffect(() => {
+    if (!hasWordPressStorage || !isWordPressReady) return
+
+    if (skipNextRemoteSaveRef.current) {
+      skipNextRemoteSaveRef.current = false
+      return
+    }
+
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current)
+    }
+
+    setSyncStatus('saving')
+    setSyncMessage('WordPressへ保存中')
+
+    saveTimerRef.current = window.setTimeout(() => {
+      void saveWordPressData(data)
+        .then((saved) => {
+          if (saved?.updatedAt) markLocalUpdatedAt(saved.updatedAt)
+          setSyncStatus('saved')
+          setSyncMessage('WordPressに保存済み')
+        })
+        .catch(() => {
+          setSyncStatus('error')
+          setSyncMessage('WordPress保存に失敗しました')
+        })
+    }, 900)
+
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current)
+      }
+    }
+  }, [data, hasWordPressStorage, isWordPressReady])
 
   const currentMonth = monthKey(new Date())
   const forecastMonths = Math.max(0, monthDistance(currentMonth, selectedMonth))
@@ -1159,6 +1382,10 @@ function App() {
           className="app-header-img"
         />
       </header>
+
+      <div className={`sync-status sync-status-${syncStatus}`} role="status" aria-live="polite">
+        {syncMessage}
+      </div>
 
       <main data-tab={activeTab}>
         <section className="month-control" aria-label="表示月">

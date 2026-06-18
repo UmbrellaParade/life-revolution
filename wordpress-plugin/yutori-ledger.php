@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution
  * Description: Adds the Umbrella Parade Life Revolution budgeting tool to WordPress with the [life_revolution] shortcode.
- * Version: 0.1.3
+ * Version: 0.1.4
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution
@@ -13,10 +13,12 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('YUTORI_LEDGER_VERSION', '0.1.3');
+define('YUTORI_LEDGER_VERSION', '0.1.4');
 define('YUTORI_LEDGER_PATH', plugin_dir_path(__FILE__));
 define('YUTORI_LEDGER_URL', plugin_dir_url(__FILE__));
 define('YUTORI_LEDGER_FRONTEND_PAGE_OPTION', 'life_revolution_frontend_page_id');
+define('YUTORI_LEDGER_STATE_META_KEY', 'life_revolution_state_v1');
+define('YUTORI_LEDGER_STATE_UPDATED_META_KEY', 'life_revolution_state_updated_at_v1');
 
 function yutori_ledger_find_asset($pattern) {
     $files = glob(YUTORI_LEDGER_PATH . 'assets/' . $pattern);
@@ -64,6 +66,10 @@ function yutori_ledger_config(): array {
     return array(
         'assetsUrl' => YUTORI_LEDGER_URL,
         'enableServiceWorker' => false,
+        'restUrl' => esc_url_raw(rest_url('life-revolution/v1')),
+        'nonce' => wp_create_nonce('wp_rest'),
+        'userId' => get_current_user_id(),
+        'hasWordPressStorage' => is_user_logged_in(),
     );
 }
 
@@ -115,6 +121,91 @@ function yutori_ledger_shortcode($atts = array()) {
 }
 add_shortcode('yutori_ledger', 'yutori_ledger_shortcode');
 add_shortcode('life_revolution', 'yutori_ledger_shortcode');
+
+function yutori_ledger_register_rest_routes() {
+    register_rest_route('life-revolution/v1', '/state', array(
+        array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => 'yutori_ledger_rest_get_state',
+            'permission_callback' => 'yutori_ledger_rest_permission',
+        ),
+        array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => 'yutori_ledger_rest_save_state',
+            'permission_callback' => 'yutori_ledger_rest_permission',
+        ),
+    ));
+}
+add_action('rest_api_init', 'yutori_ledger_register_rest_routes');
+
+function yutori_ledger_rest_permission(): bool {
+    return is_user_logged_in() && current_user_can('read');
+}
+
+function yutori_ledger_rest_get_state() {
+    $user_id = get_current_user_id();
+    $data = get_user_meta($user_id, YUTORI_LEDGER_STATE_META_KEY, true);
+    $updated_at = (string) get_user_meta($user_id, YUTORI_LEDGER_STATE_UPDATED_META_KEY, true);
+
+    if (!is_array($data)) {
+        $data = null;
+    }
+
+    return rest_ensure_response(array(
+        'data' => $data,
+        'hasData' => is_array($data),
+        'updatedAt' => $updated_at,
+    ));
+}
+
+function yutori_ledger_rest_save_state(WP_REST_Request $request) {
+    $params = $request->get_json_params();
+    $data = is_array($params) && isset($params['data']) ? $params['data'] : null;
+
+    if (!is_array($data)) {
+        return new WP_Error(
+            'life_revolution_invalid_state',
+            __('Invalid Life Revolution data.', 'life-revolution'),
+            array('status' => 400)
+        );
+    }
+
+    $encoded = wp_json_encode($data);
+    if (!is_string($encoded)) {
+        return new WP_Error(
+            'life_revolution_encode_failed',
+            __('Could not encode Life Revolution data.', 'life-revolution'),
+            array('status' => 400)
+        );
+    }
+
+    if (strlen($encoded) > 5 * 1024 * 1024) {
+        return new WP_Error(
+            'life_revolution_state_too_large',
+            __('Life Revolution data is too large.', 'life-revolution'),
+            array('status' => 413)
+        );
+    }
+
+    $normalized = json_decode($encoded, true);
+    if (!is_array($normalized)) {
+        return new WP_Error(
+            'life_revolution_decode_failed',
+            __('Could not normalize Life Revolution data.', 'life-revolution'),
+            array('status' => 400)
+        );
+    }
+
+    $updated_at = gmdate('c');
+    $user_id = get_current_user_id();
+    update_user_meta($user_id, YUTORI_LEDGER_STATE_META_KEY, $normalized);
+    update_user_meta($user_id, YUTORI_LEDGER_STATE_UPDATED_META_KEY, $updated_at);
+
+    return rest_ensure_response(array(
+        'data' => $normalized,
+        'updatedAt' => $updated_at,
+    ));
+}
 
 function yutori_ledger_activate() {
     yutori_ledger_ensure_frontend_page();

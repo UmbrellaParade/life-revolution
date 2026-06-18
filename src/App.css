@@ -35,6 +35,42 @@
   width: 100%;
 }
 
+.sync-status {
+  align-items: center;
+  background: #edf7f2;
+  border: 1px solid #c9ddd5;
+  border-radius: 8px;
+  color: var(--green);
+  display: flex;
+  font-size: 13px;
+  font-weight: 800;
+  justify-content: center;
+  margin: -6px auto 14px;
+  max-width: 1180px;
+  min-height: 34px;
+  padding: 7px 12px;
+  text-align: center;
+}
+
+.sync-status-local {
+  background: #fff7df;
+  border-color: #ecd89c;
+  color: #7a5b00;
+}
+
+.sync-status-saving,
+.sync-status-loading {
+  background: #eef5ff;
+  border-color: #cbdcf8;
+  color: var(--blue);
+}
+
+.sync-status-error {
+  background: #fff0ee;
+  border-color: #f0c4bf;
+  color: var(--danger);
+}
+
 .eyebrow {
   color: var(--muted);
   font-size: 12px;
