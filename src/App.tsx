@@ -27,6 +27,15 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 
+declare global {
+  interface Window {
+    YutoriLedgerConfig?: {
+      assetsUrl?: string
+      enableServiceWorker?: boolean
+    }
+  }
+}
+
 type Expense = {
   id: string
   amount: number
@@ -104,6 +113,10 @@ type ExpenseRule = {
   rule: string
 }
 
+type LegacyExpenseRule = Partial<ExpenseRule> & {
+  category?: string
+}
+
 type IncomeItem = {
   id: string
   name: string
@@ -133,6 +146,12 @@ type AppData = {
 type TabId = 'dashboard' | 'expense' | 'savings' | 'plans' | 'strategy' | 'cards'
 
 const storageKey = 'yutori-ledger-data-v1'
+
+function appAssetUrl(path: string) {
+  const base = window.YutoriLedgerConfig?.assetsUrl ?? import.meta.env.BASE_URL
+  const normalizedBase = base.endsWith('/') ? base : `${base}/`
+  return `${normalizedBase}${path.replace(/^\/+/, '')}`
+}
 
 const categories = [
   '食費',
@@ -312,9 +331,10 @@ function normalizeData(importedData: Partial<AppData>): AppData {
     level: (['short', 'mid', 'final'].includes(goal.level) ? goal.level : 'short') as 'short' | 'mid' | 'final',
   }))
 
-  const expenseRules = (importedData.expenseRules ?? []).map((r) => ({
+  const rawExpenseRules = (importedData.expenseRules ?? []) as LegacyExpenseRule[]
+  const expenseRules = rawExpenseRules.map((r) => ({
     id: r.id || createId(),
-    categories: Array.isArray(r.categories) ? r.categories : (r as any).category ? [(r as any).category] : [],
+    categories: Array.isArray(r.categories) ? r.categories : r.category ? [r.category] : [],
     rule: r.rule || '',
   }))
 
@@ -703,7 +723,7 @@ function App() {
       remaining,
       payoffMonths,
     }
-  }, [data.fixedCosts, data.loans, data.settings, forecastMonths, monthlyExpenses])
+  }, [data.fixedCosts, data.loans, data.settings, forecastMonths, monthlyExpenses, selectedMonth])
 
 
   const recentExpenses = [...monthlyExpenses]
@@ -1126,7 +1146,7 @@ function App() {
     <div className="app-shell">
       <header className="app-header">
         <img
-          src={`${import.meta.env.BASE_URL}header-v3.png`}
+          src={appAssetUrl('header-v3.png')}
           alt="Umbrella Parade Life Revolution"
           className="app-header-img"
         />
@@ -2956,7 +2976,7 @@ function App() {
                 </div>
               ) : (
                 <p style={{ margin: 0, color: 'var(--muted)', fontSize: 13 }}>
-                  ●●●●●●　<span style={{ fontSize: 11 }}>（目のアイコンで表示）</span>
+                  ●●●●●● <span style={{ fontSize: 11 }}>（目のアイコンで表示）</span>
                 </p>
               )}
             </div>

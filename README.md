@@ -25,3 +25,25 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## WordPress plugin
+
+Build the WordPress plugin package from the same React app:
+
+```bash
+npm run build:wp
+```
+
+The generated plugin folder is created at:
+
+```text
+wordpress-plugin/build/yutori-ledger
+```
+
+Use the shortcode below in WordPress:
+
+```text
+[yutori_ledger]
+```
+
+When changing the app, keep the GitHub Pages version and the WordPress plugin version in sync by rebuilding both from this repository.
