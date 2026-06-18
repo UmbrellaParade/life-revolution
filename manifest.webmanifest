@@ -1,6 +1,6 @@
 {
-  "name": "Yutori Ledger",
-  "short_name": "Yutori",
+  "name": "Life Revolution",
+  "short_name": "LifeRev",
   "description": "スマホで支出とローン返済を管理するPWA",
   "start_url": ".",
   "scope": ".",
