@@ -8,6 +8,7 @@ const mountedRoots = new WeakSet<Element>()
 function renderApp(target: Element) {
   if (mountedRoots.has(target)) return
 
+  target.classList.add('life-revolution-root')
   target.classList.add('yutori-ledger-root')
   createRoot(target).render(
     <StrictMode>
@@ -18,7 +19,7 @@ function renderApp(target: Element) {
 }
 
 function mountApp() {
-  const pluginRoots = document.querySelectorAll('[data-yutori-ledger-root]')
+  const pluginRoots = document.querySelectorAll('[data-life-revolution-root], [data-yutori-ledger-root]')
 
   if (pluginRoots.length > 0) {
     pluginRoots.forEach(renderApp)
@@ -36,11 +37,13 @@ if (document.readyState === 'loading') {
 }
 
 const shouldRegisterServiceWorker =
-  window.YutoriLedgerConfig?.enableServiceWorker ?? !window.YutoriLedgerConfig
+  window.LifeRevolutionConfig?.enableServiceWorker ??
+  window.YutoriLedgerConfig?.enableServiceWorker ??
+  !(window.LifeRevolutionConfig ?? window.YutoriLedgerConfig)
 
 if (shouldRegisterServiceWorker && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    const base = window.YutoriLedgerConfig?.assetsUrl ?? import.meta.env.BASE_URL
+    const base = window.LifeRevolutionConfig?.assetsUrl ?? window.YutoriLedgerConfig?.assetsUrl ?? import.meta.env.BASE_URL
     const normalizedBase = base.endsWith('/') ? base : `${base}/`
     navigator.serviceWorker.register(`${normalizedBase}sw.js`)
   })

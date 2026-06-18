@@ -4,6 +4,15 @@
   padding-bottom: 88px;
 }
 
+.yutori-ledger-root {
+  background: var(--bg);
+  color: var(--ink);
+  display: block;
+  max-width: none;
+  overflow-x: hidden;
+  width: 100%;
+}
+
 .app-header {
   align-items: center;
   display: flex;
@@ -110,6 +119,7 @@ main {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
 }
 
 /* 固定パネルを2列分に広げる */
@@ -128,6 +138,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
+  min-width: 0;
   padding: 18px;
 }
 
@@ -696,6 +707,14 @@ button {
   gap: 3px;
   min-height: 54px;
   padding: 6px 2px;
+  min-width: 0;
+}
+
+.bottom-nav button span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .bottom-nav button.active {
@@ -705,7 +724,7 @@ button {
 
 @media (max-width: 920px) {
   .app-shell {
-    padding: 14px;
+    padding: 12px;
     padding-bottom: 90px;
   }
 
@@ -749,6 +768,27 @@ button {
 
   .bottom-nav {
     display: flex;
+  }
+
+  .bottom-nav {
+    gap: 4px;
+    padding-inline: 8px;
+  }
+
+  .bottom-nav button {
+    font-size: 10px;
+    min-height: 52px;
+  }
+
+  .panel-heading {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .panel-heading,
+  .item-row,
+  .list-heading {
+    flex-wrap: wrap;
   }
 
   main[data-tab="strategy"] .month-control,
@@ -798,6 +838,15 @@ button {
 
   .segmented {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stage-summary-row,
+  .annual-chart-wrap {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .annual-chart-wrap {
+    row-gap: 10px;
   }
 }
 

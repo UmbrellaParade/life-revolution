@@ -1,32 +1,21 @@
-# Yutori Ledger
+# Life Revolution
 
-スマホで支出、固定費、ローン返済をまとめて見るためのPWAです。
+Umbrella Parade Life Revolution is a mobile-first budgeting and life-revolution tool for tracking expenses, fixed costs, loans, savings goals, side income, and strategy notes.
 
-## 方針
-
-- 支出は手入力で素早く記録する
-- 月を切り替えて、来月以降の支出入力とローン残高の見通しを確認する
-- ローンごとに残高、手数料、通常返済、追加返済を分けて管理する
-- 固定費は必要に応じて関連ローンへ紐づける
-- 登録した支出、固定費、ローンは一覧からそのまま編集する
-- メルカリやカードのログイン情報は保存しない
-- 入力データはブラウザのローカルストレージに保存する
-- 個人情報は公開リポジトリに置かず、JSONで端末ごとに読み込む
-
-## 開発
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-## ビルド
+## Build
 
 ```bash
 npm run build
 ```
 
-## WordPress plugin
+## WordPress Plugin
 
 Build the WordPress plugin package from the same React app:
 
@@ -40,10 +29,11 @@ The generated plugin folder is created at:
 wordpress-plugin/build/yutori-ledger
 ```
 
-Use the shortcode below in WordPress:
+The folder and legacy shortcode stay `yutori-ledger` / `[yutori_ledger]` for compatibility with existing WordPress installs. The user-facing plugin name and preferred shortcode are:
 
 ```text
-[yutori_ledger]
+[life_revolution]
 ```
 
-When changing the app, keep the GitHub Pages version and the WordPress plugin version in sync by rebuilding both from this repository.
+Current data is stored in the visitor's browser localStorage. Use the app's JSON export/import controls before changing devices, browsers, or clearing browser data.
+

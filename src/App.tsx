@@ -29,6 +29,10 @@ import './App.css'
 
 declare global {
   interface Window {
+    LifeRevolutionConfig?: {
+      assetsUrl?: string
+      enableServiceWorker?: boolean
+    }
     YutoriLedgerConfig?: {
       assetsUrl?: string
       enableServiceWorker?: boolean
@@ -147,8 +151,12 @@ type TabId = 'dashboard' | 'expense' | 'savings' | 'plans' | 'strategy' | 'cards
 
 const storageKey = 'yutori-ledger-data-v1'
 
+function lifeRevolutionConfig() {
+  return window.LifeRevolutionConfig ?? window.YutoriLedgerConfig
+}
+
 function appAssetUrl(path: string) {
-  const base = window.YutoriLedgerConfig?.assetsUrl ?? import.meta.env.BASE_URL
+  const base = lifeRevolutionConfig()?.assetsUrl ?? import.meta.env.BASE_URL
   const normalizedBase = base.endsWith('/') ? base : `${base}/`
   return `${normalizedBase}${path.replace(/^\/+/, '')}`
 }
@@ -1071,7 +1079,7 @@ function App() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `yutori-ledger-${todayValue()}.json`
+    anchor.download = `life-revolution-${todayValue()}.json`
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -1126,7 +1134,7 @@ function App() {
       ['タイトル', '内容', '作成日'],
       ...data.strategyNotes.map((n) => [n.title, n.content, n.createdAt]),
     ]
-    downloadCsv(`yutori-ledger-${todayValue()}.csv`, rows)
+    downloadCsv(`life-revolution-${todayValue()}.csv`, rows)
   }
 
   function importData() {

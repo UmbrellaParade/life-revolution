@@ -1,4 +1,4 @@
-const cacheName = 'yutori-ledger-v3'
+const cacheName = 'life-revolution-v1'
 const baseUrl = self.registration.scope
 const appShell = [
   baseUrl,
