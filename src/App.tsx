@@ -190,6 +190,10 @@ const paymentMethods = [
   'その他',
 ]
 
+function latestExpenseMethod(expenses: Expense[]) {
+  return expenses[0]?.method || paymentMethods[0]
+}
+
 const loanKinds = ['ショッピング', 'キャッシング', 'カードローン', '奨学金']
 
 const fixedGenres = ['住居', '通信', '保険', 'サブスク', '食費', '医療', '教育', 'その他']
@@ -539,7 +543,7 @@ function App() {
   const [expenseDraft, setExpenseDraft] = useState({
     amount: '',
     category: categories[0],
-    method: paymentMethods[0],
+    method: latestExpenseMethod(data.expenses),
     memo: '',
     date: todayValue(),
   })
@@ -1037,6 +1041,7 @@ function App() {
     setExpenseDraft((current) => ({
       ...current,
       amount: '',
+      method: expense.method,
       memo: '',
       date: todayValue().startsWith(selectedMonth) ? todayValue() : `${selectedMonth}-01`,
     }))
