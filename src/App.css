@@ -670,6 +670,52 @@ button {
   gap: 8px;
 }
 
+.data-management-panel {
+  align-self: start;
+}
+
+.data-management-lead {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0 0 16px;
+}
+
+.data-management-layout {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.data-management-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.data-management-section h3,
+.data-management-section p {
+  margin: 0;
+}
+
+.data-management-section h3 {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.data-management-section p,
+.import-message {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 4px;
+}
+
+.data-management-section textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
 .import-divider {
   align-items: center;
   display: flex;
@@ -784,7 +830,8 @@ button {
   }
 
   .content-layout,
-  .dual-column {
+  .dual-column,
+  .data-management-layout {
     grid-template-columns: 1fr;
   }
 

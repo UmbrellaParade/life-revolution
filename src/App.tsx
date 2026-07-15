@@ -8,6 +8,7 @@ import {
   CircleDollarSign,
   ClipboardList,
   CreditCard,
+  Database,
   Download,
   Eye,
   EyeOff,
@@ -155,7 +156,7 @@ type AppData = {
   cards: Card[]
 }
 
-type TabId = 'dashboard' | 'expense' | 'savings' | 'plans' | 'strategy' | 'cards'
+type TabId = 'dashboard' | 'expense' | 'savings' | 'plans' | 'strategy' | 'cards' | 'data'
 type SyncStatus = 'loading' | 'local' | 'saving' | 'saved' | 'error'
 
 const storageKey = 'yutori-ledger-data-v1'
@@ -3221,45 +3222,67 @@ function App() {
               )}
             </div>
 
-            <div className="import-panel">
+          </section>
+
+          <section
+            className={activeTab === 'data' ? 'panel active-panel data-management-panel' : 'panel data-management-panel'}
+            aria-label="データ管理"
+          >
+            <div className="panel-heading">
               <div>
-                <h3>データ管理</h3>
-                <p>書き出しで全データをバックアップ。別の端末に移すときは JSON を使ってください。</p>
+                <p className="eyebrow">Data</p>
+                <h2>データ管理</h2>
+              </div>
+              <Database size={22} />
+            </div>
+
+            <p className="data-management-lead">
+              全データのバックアップや、別の端末への移行をここで行えます。
+            </p>
+
+            <div className="data-management-layout">
+              <div className="data-management-section">
+                <div>
+                  <h3>書き出し</h3>
+                  <p>JSONは復元用、CSVはスプレッドシートで確認するときに使います。</p>
+                </div>
+                <div className="data-export-buttons">
+                  <button className="primary-button" type="button" onClick={exportData}>
+                    <Download size={17} />
+                    JSONで書き出す（バックアップ）
+                  </button>
+                  <button className="secondary-button" type="button" onClick={exportCsv}>
+                    <Download size={17} />
+                    CSVで書き出す（スプレッドシート用）
+                  </button>
+                </div>
               </div>
 
-              <div className="data-export-buttons">
-                <button className="primary-button" type="button" onClick={exportData}>
-                  <Download size={17} />
-                  JSONで書き出す（バックアップ）
+              <div className="data-management-section">
+                <div>
+                  <h3>復元・読み込み</h3>
+                  <p>バックアップしたJSONを貼り付けると、保存時点のデータを復元できます。</p>
+                </div>
+                <textarea
+                  value={importText}
+                  onChange={(event) => {
+                    setImportText(event.target.value)
+                    setImportMessage('')
+                  }}
+                  placeholder="JSONを貼り付けて読み込む"
+                  rows={7}
+                />
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={importData}
+                  disabled={!importText.trim()}
+                >
+                  <Upload size={17} />
+                  読み込む
                 </button>
-                <button className="secondary-button" type="button" onClick={exportCsv}>
-                  <Download size={17} />
-                  CSVで書き出す（スプレッドシート用）
-                </button>
+                {importMessage ? <p className="import-message">{importMessage}</p> : null}
               </div>
-
-              <div className="import-divider">
-                <span>復元・読み込み</span>
-              </div>
-              <textarea
-                value={importText}
-                onChange={(event) => {
-                  setImportText(event.target.value)
-                  setImportMessage('')
-                }}
-                placeholder='JSONを貼り付けて読み込む'
-                rows={3}
-              />
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={importData}
-                disabled={!importText.trim()}
-              >
-                <Upload size={17} />
-                読み込む
-              </button>
-              {importMessage ? <p className="import-message">{importMessage}</p> : null}
             </div>
           </section>
 
@@ -3516,6 +3539,14 @@ function App() {
         >
           <CreditCard size={19} />
           <span>カード</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'data' ? 'active' : undefined}
+          onClick={() => setActiveTab('data')}
+        >
+          <Database size={19} />
+          <span>データ</span>
         </button>
       </nav>
     </div>
