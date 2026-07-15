@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution
  * Description: Adds the Umbrella Parade Life Revolution budgeting tool to WordPress with the [life_revolution] shortcode.
- * Version: 0.1.13
+ * Version: 0.1.14
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('YUTORI_LEDGER_VERSION', '0.1.13');
+define('YUTORI_LEDGER_VERSION', '0.1.14');
 define('YUTORI_LEDGER_PATH', plugin_dir_path(__FILE__));
 define('YUTORI_LEDGER_URL', plugin_dir_url(__FILE__));
 define('YUTORI_LEDGER_FRONTEND_PAGE_OPTION', 'life_revolution_frontend_page_id');
@@ -150,14 +150,14 @@ function yutori_ledger_frontend_body_classes(array $classes): array {
 }
 add_filter('body_class', 'yutori_ledger_frontend_body_classes');
 
-function yutori_ledger_hide_mobile_admin_bar_styles(): void {
+function yutori_ledger_mobile_frontend_styles(): void {
     if (!yutori_ledger_is_frontend_app_page()) {
         return;
     }
 
-    echo '<style id="life-revolution-hide-mobile-admin-bar">@media screen and (max-width:782px){html:root{margin-top:0!important;}html:root body.life-revolution-app-page.admin-bar{margin-top:0!important;padding-top:0!important;}body.life-revolution-app-page #wpadminbar{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;transform:translate3d(0,-120%,0)!important;height:0!important;min-height:0!important;overflow:hidden!important;}}</style>';
+    echo '<style id="life-revolution-mobile-frontend">@media screen and (max-width:782px){html:root{margin-top:0!important;}body{margin-top:0!important;padding-top:0!important;}#wpadminbar,#header,#fix_header,#breadcrumb,#main_content>.l-mainContent__inner>.c-pageTitle{display:none!important;}#wpadminbar{visibility:hidden!important;opacity:0!important;pointer-events:none!important;transform:translate3d(0,-120%,0)!important;height:0!important;min-height:0!important;overflow:hidden!important;}#content.l-content{display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;}#main_content.l-mainContent,#main_content>.l-mainContent__inner,#main_content .post_content{float:none!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;}}</style>';
 }
-add_action('wp_head', 'yutori_ledger_hide_mobile_admin_bar_styles', PHP_INT_MAX);
+add_action('wp_head', 'yutori_ledger_mobile_frontend_styles', PHP_INT_MAX);
 
 function yutori_ledger_hide_mobile_admin_bar_script(): void {
     if (!yutori_ledger_is_frontend_app_page()) {
