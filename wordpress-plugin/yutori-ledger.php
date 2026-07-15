@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution
  * Description: Adds the Umbrella Parade Life Revolution budgeting tool to WordPress with the [life_revolution] shortcode.
- * Version: 0.1.6
+ * Version: 0.1.7
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('YUTORI_LEDGER_VERSION', '0.1.6');
+define('YUTORI_LEDGER_VERSION', '0.1.7');
 define('YUTORI_LEDGER_PATH', plugin_dir_path(__FILE__));
 define('YUTORI_LEDGER_URL', plugin_dir_url(__FILE__));
 define('YUTORI_LEDGER_FRONTEND_PAGE_OPTION', 'life_revolution_frontend_page_id');
@@ -141,21 +141,34 @@ function yutori_ledger_is_frontend_app_page(): bool {
     return has_shortcode($content, 'life_revolution') || has_shortcode($content, 'yutori_ledger');
 }
 
-function yutori_ledger_hide_frontend_admin_bar(): void {
+function yutori_ledger_frontend_body_classes(array $classes): array {
     if (yutori_ledger_is_frontend_app_page()) {
-        show_admin_bar(false);
+        $classes[] = 'life-revolution-app-page';
     }
-}
-add_action('wp', 'yutori_ledger_hide_frontend_admin_bar');
 
-function yutori_ledger_hide_frontend_admin_bar_styles(): void {
+    return $classes;
+}
+add_filter('body_class', 'yutori_ledger_frontend_body_classes');
+
+function yutori_ledger_hide_mobile_admin_bar_styles(): void {
     if (!yutori_ledger_is_frontend_app_page()) {
         return;
     }
 
-    echo '<style id="life-revolution-hide-admin-bar">html{margin-top:0!important;}#wpadminbar{display:none!important;}</style>';
+    echo '<style id="life-revolution-hide-mobile-admin-bar">@media screen and (max-width:782px){html:root{margin-top:0!important;}html:root body.life-revolution-app-page.admin-bar{margin-top:0!important;padding-top:0!important;}body.life-revolution-app-page #wpadminbar{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;transform:translate3d(0,-120%,0)!important;height:0!important;min-height:0!important;overflow:hidden!important;}}</style>';
 }
-add_action('wp_head', 'yutori_ledger_hide_frontend_admin_bar_styles', 0);
+add_action('wp_head', 'yutori_ledger_hide_mobile_admin_bar_styles', PHP_INT_MAX);
+
+function yutori_ledger_hide_mobile_admin_bar_script(): void {
+    if (!yutori_ledger_is_frontend_app_page()) {
+        return;
+    }
+
+    $script = '(function(){var query=window.matchMedia("(max-width: 782px)");var scheduled=false;var sync=function(){scheduled=false;var mobile=query.matches;var root=document.documentElement;var body=document.body;var bar=document.getElementById("wpadminbar");root.classList.toggle("life-revolution-mobile",mobile);if(body){if(mobile){body.style.setProperty("margin-top","0","important");body.style.setProperty("padding-top","0","important");}else{body.style.removeProperty("margin-top");body.style.removeProperty("padding-top");}}if(bar){if(mobile){bar.setAttribute("aria-hidden","true");bar.style.setProperty("display","none","important");bar.style.setProperty("visibility","hidden","important");bar.style.setProperty("opacity","0","important");bar.style.setProperty("pointer-events","none","important");bar.style.setProperty("transform","translate3d(0,-120%,0)","important");bar.style.setProperty("height","0","important");bar.style.setProperty("min-height","0","important");bar.style.setProperty("overflow","hidden","important");}else{bar.removeAttribute("aria-hidden");["display","visibility","opacity","pointer-events","transform","height","min-height","overflow"].forEach(function(property){bar.style.removeProperty(property);});}}};var schedule=function(){if(scheduled){return;}scheduled=true;window.requestAnimationFrame(sync);};sync();window.addEventListener("scroll",schedule,{passive:true});window.addEventListener("resize",schedule);if(query.addEventListener){query.addEventListener("change",schedule);}else{query.addListener(schedule);}if("MutationObserver" in window){new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});}})();';
+
+    wp_print_inline_script_tag($script, array('id' => 'life-revolution-hide-mobile-admin-bar-script'));
+}
+add_action('wp_footer', 'yutori_ledger_hide_mobile_admin_bar_script', PHP_INT_MAX);
 
 function yutori_ledger_register_rest_routes() {
     register_rest_route('life-revolution/v1', '/state', array(
