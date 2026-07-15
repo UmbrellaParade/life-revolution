@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution
  * Description: Adds the Umbrella Parade Life Revolution budgeting tool to WordPress with the [life_revolution] shortcode.
- * Version: 0.1.5
+ * Version: 0.1.6
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('YUTORI_LEDGER_VERSION', '0.1.5');
+define('YUTORI_LEDGER_VERSION', '0.1.6');
 define('YUTORI_LEDGER_PATH', plugin_dir_path(__FILE__));
 define('YUTORI_LEDGER_URL', plugin_dir_url(__FILE__));
 define('YUTORI_LEDGER_FRONTEND_PAGE_OPTION', 'life_revolution_frontend_page_id');
@@ -121,6 +121,41 @@ function yutori_ledger_shortcode($atts = array()) {
 }
 add_shortcode('yutori_ledger', 'yutori_ledger_shortcode');
 add_shortcode('life_revolution', 'yutori_ledger_shortcode');
+
+function yutori_ledger_is_frontend_app_page(): bool {
+    if (is_admin()) {
+        return false;
+    }
+
+    $page_id = yutori_ledger_find_frontend_page_id();
+    if ($page_id > 0 && is_page($page_id)) {
+        return true;
+    }
+
+    $post = get_post();
+    if (!$post instanceof WP_Post) {
+        return false;
+    }
+
+    $content = (string) $post->post_content;
+    return has_shortcode($content, 'life_revolution') || has_shortcode($content, 'yutori_ledger');
+}
+
+function yutori_ledger_hide_frontend_admin_bar(): void {
+    if (yutori_ledger_is_frontend_app_page()) {
+        show_admin_bar(false);
+    }
+}
+add_action('wp', 'yutori_ledger_hide_frontend_admin_bar');
+
+function yutori_ledger_hide_frontend_admin_bar_styles(): void {
+    if (!yutori_ledger_is_frontend_app_page()) {
+        return;
+    }
+
+    echo '<style id="life-revolution-hide-admin-bar">html{margin-top:0!important;}#wpadminbar{display:none!important;}</style>';
+}
+add_action('wp_head', 'yutori_ledger_hide_frontend_admin_bar_styles', 0);
 
 function yutori_ledger_register_rest_routes() {
     register_rest_route('life-revolution/v1', '/state', array(

@@ -4,7 +4,7 @@ Tags: budgeting, savings, ledger, react
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 0.1.5
+Stable tag: 0.1.6
 License: GPL-2.0-or-later
 
 Life Revolution is the WordPress plugin package for the Umbrella Parade Life Revolution budgeting tool.
