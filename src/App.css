@@ -71,12 +71,16 @@
   color: var(--danger);
 }
 
-.eyebrow {
+.eyebrow,
+.panel-heading .eyebrow {
+  background: none;
+  border: 0;
   color: var(--muted);
   font-size: 12px;
   font-weight: 750;
   letter-spacing: 0;
   margin: 0;
+  padding: 0;
   text-transform: uppercase;
 }
 
@@ -133,6 +137,10 @@ main {
   font-weight: 700;
 }
 
+.metric-card > span {
+  color: var(--muted);
+}
+
 .metric-card strong {
   color: var(--ink);
   font-size: clamp(22px, 3.2vw, 42px);
@@ -187,10 +195,32 @@ main {
 }
 
 .panel-heading h2 {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   color: var(--ink);
+  display: block;
+  font-family: inherit;
   font-size: 20px;
-  line-height: 1.1;
+  font-style: normal;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1.25;
   margin: 4px 0 0;
+  min-height: 0;
+  padding: 0;
+  position: static;
+  text-align: left;
+  text-decoration: none;
+  text-transform: none;
+  width: auto;
+}
+
+.panel-heading h2::before,
+.panel-heading h2::after {
+  content: none;
+  display: none;
 }
 
 .settings-grid,
