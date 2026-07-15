@@ -733,6 +733,37 @@ button {
   margin: 0;
 }
 
+.app-shell .panel .compact-form h3,
+.app-shell .panel .list-heading h3,
+.app-shell .panel .data-management-section h3,
+.app-shell .panel .import-panel h3 {
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: var(--ink) !important;
+  letter-spacing: 0 !important;
+  line-height: 1.35;
+  margin: 0;
+  padding: 0 !important;
+  position: static !important;
+  text-align: left;
+  text-decoration: none;
+  text-transform: none;
+}
+
+.app-shell .panel .compact-form h3::before,
+.app-shell .panel .compact-form h3::after,
+.app-shell .panel .list-heading h3::before,
+.app-shell .panel .list-heading h3::after,
+.app-shell .panel .data-management-section h3::before,
+.app-shell .panel .data-management-section h3::after,
+.app-shell .panel .import-panel h3::before,
+.app-shell .panel .import-panel h3::after {
+  content: none !important;
+  display: none !important;
+}
+
 .data-management-section h3 {
   color: var(--ink);
   font-size: 15px;
