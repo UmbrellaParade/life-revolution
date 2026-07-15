@@ -72,7 +72,8 @@
 }
 
 .eyebrow,
-.panel-heading .eyebrow {
+.panel-heading .eyebrow,
+.app-shell .panel .panel-heading .eyebrow {
   background: none !important;
   border: 0 !important;
   color: var(--muted) !important;
@@ -137,7 +138,8 @@ main {
   font-weight: 700;
 }
 
-.metric-card > span {
+.metric-card > span,
+.app-shell .summary-grid .metric-card > span {
   color: var(--muted) !important;
 }
 
@@ -194,7 +196,8 @@ main {
   margin-bottom: 16px;
 }
 
-.panel-heading h2 {
+.panel-heading h2,
+.app-shell .panel .panel-heading h2 {
   background: none !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -218,7 +221,9 @@ main {
 }
 
 .panel-heading h2::before,
-.panel-heading h2::after {
+.panel-heading h2::after,
+.app-shell .panel .panel-heading h2::before,
+.app-shell .panel .panel-heading h2::after {
   content: none !important;
   display: none !important;
 }
