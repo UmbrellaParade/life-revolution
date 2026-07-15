@@ -73,9 +73,9 @@
 
 .eyebrow,
 .panel-heading .eyebrow {
-  background: none;
-  border: 0;
-  color: var(--muted);
+  background: none !important;
+  border: 0 !important;
+  color: var(--muted) !important;
   font-size: 12px;
   font-weight: 750;
   letter-spacing: 0;
@@ -138,7 +138,7 @@ main {
 }
 
 .metric-card > span {
-  color: var(--muted);
+  color: var(--muted) !important;
 }
 
 .metric-card strong {
@@ -195,11 +195,11 @@ main {
 }
 
 .panel-heading h2 {
-  background: none;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  color: var(--ink);
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: var(--ink) !important;
   display: block;
   font-family: inherit;
   font-size: 20px;
@@ -209,7 +209,7 @@ main {
   line-height: 1.25;
   margin: 4px 0 0;
   min-height: 0;
-  padding: 0;
+  padding: 0 !important;
   position: static;
   text-align: left;
   text-decoration: none;
@@ -219,8 +219,8 @@ main {
 
 .panel-heading h2::before,
 .panel-heading h2::after {
-  content: none;
-  display: none;
+  content: none !important;
+  display: none !important;
 }
 
 .settings-grid,
