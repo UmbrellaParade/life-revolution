@@ -4,7 +4,7 @@ Tags: budgeting, savings, ledger, react
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 0.1.18
+Stable tag: 0.2.0
 License: GPL-2.0-or-later
 
 Life Revolution is the WordPress plugin package for the Umbrella Parade Life Revolution budgeting tool.
@@ -12,14 +12,16 @@ Life Revolution is the WordPress plugin package for the Umbrella Parade Life Rev
 == Installation ==
 1. Upload the plugin ZIP from the WordPress Plugins screen, or copy the yutori-ledger folder into wp-content/plugins.
 2. Activate Life Revolution.
-3. Add the shortcode [life_revolution] to any page.
+3. Add the shortcode [life_revolution] to a public page.
 
 The legacy shortcode [yutori_ledger] still works for existing pages.
 
 The plugin also adds a Life Revolution item to the WordPress admin menu.
 
 == Data Storage ==
-Current data is stored in the visitor's browser localStorage. It is not saved to the WordPress database.
+The public shortcode stores each visitor's data only in that visitor's browser. It never reads the administrator's WordPress data.
+
+The private WordPress admin screen stores its data in the current administrator's WordPress user metadata. Public and private browser-storage keys are separate.
 
 Use the app's JSON export/import controls before changing devices, browsers, or clearing browser data.
 

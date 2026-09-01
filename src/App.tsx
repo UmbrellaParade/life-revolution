@@ -37,6 +37,8 @@ declare global {
       nonce?: string
       userId?: number
       hasWordPressStorage?: boolean
+      storageKey?: string
+      localUpdatedAtKey?: string
     }
     YutoriLedgerConfig?: {
       assetsUrl?: string
@@ -45,6 +47,8 @@ declare global {
       nonce?: string
       userId?: number
       hasWordPressStorage?: boolean
+      storageKey?: string
+      localUpdatedAtKey?: string
     }
   }
 }
@@ -159,11 +163,19 @@ type AppData = {
 type TabId = 'dashboard' | 'expense' | 'savings' | 'plans' | 'strategy' | 'cards' | 'data'
 type SyncStatus = 'loading' | 'local' | 'saving' | 'saved' | 'error'
 
-const storageKey = 'yutori-ledger-data-v1'
-const localUpdatedAtKey = 'life-revolution-local-updated-at-v1'
+const defaultStorageKey = 'yutori-ledger-data-v1'
+const defaultLocalUpdatedAtKey = 'life-revolution-local-updated-at-v1'
 
 function lifeRevolutionConfig() {
   return window.LifeRevolutionConfig ?? window.YutoriLedgerConfig
+}
+
+function localDataStorageKey() {
+  return lifeRevolutionConfig()?.storageKey || defaultStorageKey
+}
+
+function localUpdatedAtStorageKey() {
+  return lifeRevolutionConfig()?.localUpdatedAtKey || defaultLocalUpdatedAtKey
 }
 
 function appAssetUrl(path: string) {
@@ -418,7 +430,7 @@ function hasMeaningfulData(value: Partial<AppData>) {
 
 function loadData(): AppData {
   try {
-    const raw = localStorage.getItem(storageKey)
+    const raw = localStorage.getItem(localDataStorageKey())
     if (!raw) return defaultData
 
     return normalizeData(JSON.parse(raw) as Partial<AppData>)
@@ -429,7 +441,7 @@ function loadData(): AppData {
 
 function loadLocalUpdatedAt() {
   try {
-    return localStorage.getItem(localUpdatedAtKey) || ''
+    return localStorage.getItem(localUpdatedAtStorageKey()) || ''
   } catch {
     return ''
   }
@@ -437,7 +449,7 @@ function loadLocalUpdatedAt() {
 
 function markLocalUpdatedAt(value = new Date().toISOString()) {
   try {
-    localStorage.setItem(localUpdatedAtKey, value)
+    localStorage.setItem(localUpdatedAtStorageKey(), value)
   } catch {
     // localStorage can fail in private browsing modes; WordPress save still works.
   }
@@ -768,7 +780,7 @@ function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(storageKey, JSON.stringify(data))
+      localStorage.setItem(localDataStorageKey(), JSON.stringify(data))
     } catch {
       // WordPress storage is the primary backup when it is available.
     }

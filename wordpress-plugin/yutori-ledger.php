@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution
  * Description: Adds the Umbrella Parade Life Revolution budgeting tool to WordPress with the [life_revolution] shortcode.
- * Version: 0.1.18
+ * Version: 0.2.0
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('YUTORI_LEDGER_VERSION', '0.1.18');
+define('YUTORI_LEDGER_VERSION', '0.2.0');
 define('YUTORI_LEDGER_PATH', plugin_dir_path(__FILE__));
 define('YUTORI_LEDGER_URL', plugin_dir_url(__FILE__));
 define('YUTORI_LEDGER_FRONTEND_PAGE_OPTION', 'life_revolution_frontend_page_id');
@@ -30,7 +30,7 @@ function yutori_ledger_find_asset($pattern) {
     return basename($files[0]);
 }
 
-function yutori_ledger_enqueue_app() {
+function yutori_ledger_enqueue_app($mode = 'private') {
     $script_asset = yutori_ledger_find_asset('index-*.js');
     $style_asset = yutori_ledger_find_asset('index-*.css');
 
@@ -56,30 +56,34 @@ function yutori_ledger_enqueue_app() {
 
         wp_add_inline_script(
             'yutori-ledger-app',
-            yutori_ledger_config_js(),
+            yutori_ledger_config_js($mode),
             'before'
         );
     }
 }
 
-function yutori_ledger_config(): array {
+function yutori_ledger_config($mode = 'private'): array {
+    $is_private = 'private' === $mode && current_user_can('manage_options');
+
     return array(
         'assetsUrl' => YUTORI_LEDGER_URL,
         'enableServiceWorker' => false,
-        'restUrl' => esc_url_raw(rest_url('life-revolution/v1')),
-        'nonce' => wp_create_nonce('wp_rest'),
-        'userId' => get_current_user_id(),
-        'hasWordPressStorage' => is_user_logged_in(),
+        'restUrl' => $is_private ? esc_url_raw(rest_url('life-revolution/v1')) : '',
+        'nonce' => $is_private ? wp_create_nonce('wp_rest') : '',
+        'userId' => $is_private ? get_current_user_id() : 0,
+        'hasWordPressStorage' => $is_private,
+        'storageKey' => $is_private ? 'yutori-ledger-data-v1' : 'life-revolution-public-data-v1',
+        'localUpdatedAtKey' => $is_private ? 'life-revolution-local-updated-at-v1' : 'life-revolution-public-updated-at-v1',
     );
 }
 
-function yutori_ledger_config_js(): string {
-    $config = wp_json_encode(yutori_ledger_config());
+function yutori_ledger_config_js($mode = 'private'): string {
+    $config = wp_json_encode(yutori_ledger_config($mode));
     return 'window.LifeRevolutionConfig = ' . $config . '; window.YutoriLedgerConfig = window.LifeRevolutionConfig;';
 }
 
-function yutori_ledger_config_script(): string {
-    return '<script>' . yutori_ledger_config_js() . '</script>';
+function yutori_ledger_config_script($mode = 'private'): string {
+    return '<script>' . yutori_ledger_config_js($mode) . '</script>';
 }
 
 function yutori_ledger_script_loader_tag($tag, $handle, $src) {
@@ -100,24 +104,12 @@ function yutori_ledger_shortcode($atts = array()) {
         'yutori_ledger'
     );
 
-    if (!is_user_logged_in()) {
-        $redirect = get_permalink();
-        if (!$redirect) {
-            $redirect = home_url('/');
-        }
-
-        return '<div class="life-revolution-login-notice">'
-            . '<p>' . esc_html__('Life Revolutionはログイン中のユーザーだけが使えます。', 'life-revolution') . '</p>'
-            . '<p><a class="button button-primary" href="' . esc_url(wp_login_url($redirect)) . '">' . esc_html__('ログインして開く', 'life-revolution') . '</a></p>'
-            . '</div>';
-    }
-
-    yutori_ledger_enqueue_app();
+    yutori_ledger_enqueue_app('public');
 
     $extra_class = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $atts['class']);
     $classes = trim('life-revolution-root yutori-ledger-root ' . $extra_class);
 
-    return yutori_ledger_config_script() . '<div class="' . esc_attr($classes) . '" data-life-revolution-root data-yutori-ledger-root></div>';
+    return yutori_ledger_config_script('public') . '<div class="' . esc_attr($classes) . '" data-life-revolution-root data-yutori-ledger-root></div>';
 }
 add_shortcode('yutori_ledger', 'yutori_ledger_shortcode');
 add_shortcode('life_revolution', 'yutori_ledger_shortcode');
@@ -187,7 +179,7 @@ function yutori_ledger_register_rest_routes() {
 add_action('rest_api_init', 'yutori_ledger_register_rest_routes');
 
 function yutori_ledger_rest_permission(): bool {
-    return is_user_logged_in() && current_user_can('read');
+    return is_user_logged_in() && current_user_can('manage_options');
 }
 
 function yutori_ledger_rest_get_state() {
@@ -255,65 +247,6 @@ function yutori_ledger_rest_save_state(WP_REST_Request $request) {
     ));
 }
 
-function yutori_ledger_activate() {
-    yutori_ledger_ensure_frontend_page();
-}
-register_activation_hook(__FILE__, 'yutori_ledger_activate');
-
-function yutori_ledger_handle_create_frontend_page() {
-    if (!current_user_can('publish_pages')) {
-        wp_die(esc_html__('You do not have permission to create pages.', 'life-revolution'));
-    }
-
-    check_admin_referer('life_revolution_create_frontend_page');
-    yutori_ledger_ensure_frontend_page(true);
-    wp_safe_redirect(admin_url('admin.php?page=life-revolution'));
-    exit;
-}
-add_action('admin_post_life_revolution_create_frontend_page', 'yutori_ledger_handle_create_frontend_page');
-
-function yutori_ledger_ensure_frontend_page($force = false): int {
-    $existing_page_id = yutori_ledger_find_frontend_page_id();
-    if ($existing_page_id > 0) {
-        return $existing_page_id;
-    }
-
-    $existing = get_page_by_path('life-revolution');
-    if ($existing instanceof WP_Post && $existing->post_status !== 'trash') {
-        $page_id = (int) $existing->ID;
-        $updates = array('ID' => $page_id);
-        if (!has_shortcode((string) $existing->post_content, 'life_revolution')) {
-            $updates['post_content'] = trim((string) $existing->post_content) . "\n\n[life_revolution]";
-        }
-        if ($existing->post_status !== 'private') {
-            $updates['post_status'] = 'private';
-        }
-        if (count($updates) > 1 && ($force || isset($updates['post_status']))) {
-            wp_update_post($updates);
-        }
-        update_option(YUTORI_LEDGER_FRONTEND_PAGE_OPTION, $page_id, false);
-        return $page_id;
-    }
-
-    $page_id = wp_insert_post(array(
-        'post_type' => 'page',
-        'post_status' => 'private',
-        'post_title' => 'Life Revolution',
-        'post_name' => 'life-revolution',
-        'post_content' => '[life_revolution]',
-        'post_author' => get_current_user_id() ?: 1,
-        'comment_status' => 'closed',
-        'ping_status' => 'closed',
-    ));
-
-    if (!is_wp_error($page_id) && $page_id > 0) {
-        update_option(YUTORI_LEDGER_FRONTEND_PAGE_OPTION, (int) $page_id, false);
-        return (int) $page_id;
-    }
-
-    return 0;
-}
-
 function yutori_ledger_find_frontend_page_id(): int {
     $page_id = (int) get_option(YUTORI_LEDGER_FRONTEND_PAGE_OPTION, 0);
     $page = $page_id > 0 ? get_post($page_id) : null;
@@ -330,20 +263,11 @@ function yutori_ledger_find_frontend_page_id(): int {
     return 0;
 }
 
-function yutori_ledger_frontend_page_url(): string {
-    $page_id = yutori_ledger_find_frontend_page_id();
-    if ($page_id > 0) {
-        return (string) get_permalink($page_id);
-    }
-
-    return '';
-}
-
 function yutori_ledger_register_admin_page() {
     add_menu_page(
         __('Life Revolution', 'life-revolution'),
         __('Life Revolution', 'life-revolution'),
-        'read',
+        'manage_options',
         'life-revolution',
         'yutori_ledger_render_admin_page',
         'dashicons-chart-line',
@@ -354,30 +278,20 @@ add_action('admin_menu', 'yutori_ledger_register_admin_page');
 
 function yutori_ledger_enqueue_admin_assets($hook_suffix) {
     if ('toplevel_page_life-revolution' === $hook_suffix) {
-        yutori_ledger_enqueue_app();
+        yutori_ledger_enqueue_app('private');
     }
 }
 add_action('admin_enqueue_scripts', 'yutori_ledger_enqueue_admin_assets');
 
 function yutori_ledger_render_admin_page() {
-    $frontend_url = yutori_ledger_frontend_page_url();
-    $create_page_url = wp_nonce_url(
-        admin_url('admin-post.php?action=life_revolution_create_frontend_page'),
-        'life_revolution_create_frontend_page'
-    );
+    if (!current_user_can('manage_options')) {
+        wp_die(esc_html__('You do not have permission to use Life Revolution.', 'life-revolution'));
+    }
 
     echo '<div class="wrap">';
     echo '<h1>' . esc_html__('Life Revolution', 'life-revolution') . '</h1>';
-    echo '<p>';
-    if ($frontend_url !== '') {
-        echo '<a class="button button-primary" href="' . esc_url($frontend_url) . '" target="_blank" rel="noopener">' . esc_html__('スマホ用ページを開く', 'life-revolution') . '</a> ';
-        echo '<span class="description">' . esc_html__('ログイン中のユーザーだけが開けるスマホ用ページです。', 'life-revolution') . '</span>';
-    } else {
-        echo '<a class="button button-primary" href="' . esc_url($create_page_url) . '">' . esc_html__('スマホ用ページを作成', 'life-revolution') . '</a> ';
-        echo '<span class="description">' . esc_html__('固定ページ life-revolution に [life_revolution] を入れて作成します。', 'life-revolution') . '</span>';
-    }
-    echo '</p>';
-    echo yutori_ledger_config_script();
+    echo '<p class="description">' . esc_html__('この管理画面のデータはWordPressに保存され、公開版とは分離されています。', 'life-revolution') . '</p>';
+    echo yutori_ledger_config_script('private');
     echo '<div class="life-revolution-root yutori-ledger-root" data-life-revolution-root data-yutori-ledger-root></div>';
     echo '</div>';
 }
