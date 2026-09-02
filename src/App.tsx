@@ -2624,145 +2624,159 @@ function App() {
                   const orderedGenres = fixedGenres.filter((g) => grouped[g]?.length > 0)
                   return (
                     <div className="item-list plan-list" style={{ gap: 12 }}>
-                      {orderedGenres.map((genre) => (
-                        <div key={genre}>
-                          <div className="genre-header">{genre}</div>
-                          <ul className="item-list" style={{ gap: 6 }}>
-                            {grouped[genre].map((cost) => {
-                              const relatedLoan = data.loans.find((loan) => loan.id === cost.loanId)
-                              const isFixedExpanded = expandedFixedIds.has(cost.id)
-                              const isFixedFunded = cost.fundedMonths.includes(selectedMonth)
-                              return (
-                                <li key={cost.id} className="stacked-item">
-                                  <div className="item-row">
-                                    <button
-                                      className="check-button"
-                                      type="button"
-                                      onClick={() => toggleFixedCost(cost.id)}
-                                      aria-label="固定費の有効状態を切り替え"
-                                      title="有効状態を切り替え"
-                                    >
-                                      {cost.active ? <CheckCircle2 size={19} /> : <CircleDollarSign size={19} />}
-                                    </button>
-                                    <button
-                                      className={isFixedFunded ? 'check-button funded-button active' : 'check-button funded-button'}
-                                      type="button"
-                                      onClick={() => toggleFixedFunded(cost.id)}
-                                      aria-label={isFixedFunded ? '充当済み（取り消し）' : '今月は充当済みにする'}
-                                      title={isFixedFunded ? '充当済み：今月の収支から除外中（クリックで取り消し）' : '充当済み：今月の収支計算から除外する'}
-                                    >
-                                      <PiggyBank size={17} />
-                                    </button>
-                                    <div className="item-main">
-                                      <span>
-                                        {cost.name}
-                                        {isFixedFunded ? <span className="funded-badge">充当済み</span> : null}
-                                        {cost.isInvestment ? <span className="invest-badge">投資</span> : null}
-                                        {cost.noAlternative ? <span className="invest-badge" style={{ background: '#f0e8ff', borderColor: '#c4a0f0', color: '#5b2da0' }}>代替不可</span> : null}
-                                      </span>
-                                      <strong className={isFixedFunded ? 'muted-text' : ''}>{yen(cost.amount)}</strong>
-                                      <small>
-                                        毎月{cost.dueDay}日 / {cost.method}
-                                        {relatedLoan ? ` / ${relatedLoan.name}` : ''}
-                                      </small>
-                                    </div>
-                                    <button
-                                      className="icon-button subtle"
-                                      type="button"
-                                      onClick={() => toggleFixedExpanded(cost.id)}
-                                      aria-label={isFixedExpanded ? '折りたたむ' : '編集する'}
-                                    >
-                                      <ChevronDown size={17} style={{ transform: isFixedExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-                                    </button>
-                                    <button
-                                      className="icon-button subtle"
-                                      type="button"
-                                      onClick={() => deleteFixedCost(cost.id)}
-                                      aria-label="固定費を削除"
-                                    >
-                                      <Trash2 size={17} />
-                                    </button>
-                                  </div>
-                                  {isFixedExpanded && (
-                                    <div className="edit-grid">
-                                      <label className="mini-field">
-                                        <span>名前</span>
-                                        <input
-                                          value={cost.name}
-                                          onChange={(event) => updateFixedCost(cost.id, { name: event.target.value })}
-                                        />
-                                      </label>
-                                      <label className="mini-field">
-                                        <span>ジャンル</span>
-                                        <select
-                                          value={cost.genre || 'その他'}
-                                          onChange={(event) => updateFixedCost(cost.id, { genre: event.target.value })}
-                                        >
-                                          {fixedGenres.map((g) => <option key={g}>{g}</option>)}
-                                        </select>
-                                      </label>
-                                      <label className="mini-field">
-                                        <span>金額</span>
-                                        <input
-                                          inputMode="numeric"
-                                          type="number"
-                                          min="0"
-                                          value={cost.amount || ''}
-                                          onFocus={(e) => e.target.select()}
-                                          onChange={(event) => updateFixedCost(cost.id, { amount: Number(event.target.value) })}
-                                        />
-                                      </label>
-                                      <label className="mini-field">
-                                        <span>支払日</span>
-                                        <input
-                                          inputMode="numeric"
-                                          type="number"
-                                          min="1"
-                                          max="31"
-                                          value={cost.dueDay}
-                                          onFocus={(e) => e.target.select()}
-                                          onChange={(event) => updateFixedCost(cost.id, { dueDay: Number(event.target.value) })}
-                                        />
-                                      </label>
-                                      <label className="mini-field">
-                                        <span>支払い方法</span>
-                                        <select
-                                          value={cost.method}
-                                          onChange={(event) => {
-                                            const method = event.target.value
-                                            const linkedLoan = data.loans.find((l) => l.name === method)
-                                            updateFixedCost(cost.id, { method, loanId: linkedLoan?.id || undefined })
-                                          }}
-                                        >
-                                          {allPaymentMethods.map((method) => <option key={method}>{method}</option>)}
-                                        </select>
-                                      </label>
-                                      <div className="full-span" style={{ display: 'flex', gap: 12 }}>
-                                        <label className="check-label" style={{ flex: 1 }}>
-                                          <input
-                                            type="checkbox"
-                                            checked={cost.isInvestment ?? false}
-                                            onChange={(e) => updateFixedCost(cost.id, { isInvestment: e.target.checked })}
-                                          />
-                                          <span>投資・自己成長</span>
-                                        </label>
-                                        <label className="check-label" style={{ flex: 1 }}>
-                                          <input
-                                            type="checkbox"
-                                            checked={cost.noAlternative ?? false}
-                                            onChange={(e) => updateFixedCost(cost.id, { noAlternative: e.target.checked })}
-                                          />
-                                          <span>代替手段なし</span>
-                                        </label>
+                      {orderedGenres.map((genre) => {
+                        const genreCosts = grouped[genre]
+                        const activeGenreCosts = genreCosts.filter((cost) => cost.active)
+                        const activeGenreTotal = activeGenreCosts.reduce(
+                          (sum, cost) => sum + cost.amount,
+                          0,
+                        )
+
+                        return (
+                          <div key={genre}>
+                            <div className="genre-header">
+                              <span>{genre}</span>
+                              <span className="genre-header-total">
+                                有効{activeGenreCosts.length}件・{yen(activeGenreTotal)}
+                              </span>
+                            </div>
+                            <ul className="item-list" style={{ gap: 6 }}>
+                              {genreCosts.map((cost) => {
+                                const relatedLoan = data.loans.find((loan) => loan.id === cost.loanId)
+                                const isFixedExpanded = expandedFixedIds.has(cost.id)
+                                const isFixedFunded = cost.fundedMonths.includes(selectedMonth)
+                                return (
+                                  <li key={cost.id} className="stacked-item">
+                                    <div className="item-row">
+                                      <button
+                                        className="check-button"
+                                        type="button"
+                                        onClick={() => toggleFixedCost(cost.id)}
+                                        aria-label="固定費の有効状態を切り替え"
+                                        title="有効状態を切り替え"
+                                      >
+                                        {cost.active ? <CheckCircle2 size={19} /> : <CircleDollarSign size={19} />}
+                                      </button>
+                                      <button
+                                        className={isFixedFunded ? 'check-button funded-button active' : 'check-button funded-button'}
+                                        type="button"
+                                        onClick={() => toggleFixedFunded(cost.id)}
+                                        aria-label={isFixedFunded ? '充当済み（取り消し）' : '今月は充当済みにする'}
+                                        title={isFixedFunded ? '充当済み：今月の収支から除外中（クリックで取り消し）' : '充当済み：今月の収支計算から除外する'}
+                                      >
+                                        <PiggyBank size={17} />
+                                      </button>
+                                      <div className="item-main">
+                                        <span>
+                                          {cost.name}
+                                          {isFixedFunded ? <span className="funded-badge">充当済み</span> : null}
+                                          {cost.isInvestment ? <span className="invest-badge">投資</span> : null}
+                                          {cost.noAlternative ? <span className="invest-badge" style={{ background: '#f0e8ff', borderColor: '#c4a0f0', color: '#5b2da0' }}>代替不可</span> : null}
+                                        </span>
+                                        <strong className={isFixedFunded ? 'muted-text' : ''}>{yen(cost.amount)}</strong>
+                                        <small>
+                                          毎月{cost.dueDay}日 / {cost.method}
+                                          {relatedLoan ? ` / ${relatedLoan.name}` : ''}
+                                        </small>
                                       </div>
+                                      <button
+                                        className="icon-button subtle"
+                                        type="button"
+                                        onClick={() => toggleFixedExpanded(cost.id)}
+                                        aria-label={isFixedExpanded ? '折りたたむ' : '編集する'}
+                                      >
+                                        <ChevronDown size={17} style={{ transform: isFixedExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                                      </button>
+                                      <button
+                                        className="icon-button subtle"
+                                        type="button"
+                                        onClick={() => deleteFixedCost(cost.id)}
+                                        aria-label="固定費を削除"
+                                      >
+                                        <Trash2 size={17} />
+                                      </button>
                                     </div>
-                                  )}
-                                </li>
-                              )
-                            })}
-                          </ul>
-                        </div>
-                      ))}
+                                    {isFixedExpanded && (
+                                      <div className="edit-grid">
+                                        <label className="mini-field">
+                                          <span>名前</span>
+                                          <input
+                                            value={cost.name}
+                                            onChange={(event) => updateFixedCost(cost.id, { name: event.target.value })}
+                                          />
+                                        </label>
+                                        <label className="mini-field">
+                                          <span>ジャンル</span>
+                                          <select
+                                            value={cost.genre || 'その他'}
+                                            onChange={(event) => updateFixedCost(cost.id, { genre: event.target.value })}
+                                          >
+                                            {fixedGenres.map((g) => <option key={g}>{g}</option>)}
+                                          </select>
+                                        </label>
+                                        <label className="mini-field">
+                                          <span>金額</span>
+                                          <input
+                                            inputMode="numeric"
+                                            type="number"
+                                            min="0"
+                                            value={cost.amount || ''}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={(event) => updateFixedCost(cost.id, { amount: Number(event.target.value) })}
+                                          />
+                                        </label>
+                                        <label className="mini-field">
+                                          <span>支払日</span>
+                                          <input
+                                            inputMode="numeric"
+                                            type="number"
+                                            min="1"
+                                            max="31"
+                                            value={cost.dueDay}
+                                            onFocus={(e) => e.target.select()}
+                                            onChange={(event) => updateFixedCost(cost.id, { dueDay: Number(event.target.value) })}
+                                          />
+                                        </label>
+                                        <label className="mini-field">
+                                          <span>支払い方法</span>
+                                          <select
+                                            value={cost.method}
+                                            onChange={(event) => {
+                                              const method = event.target.value
+                                              const linkedLoan = data.loans.find((l) => l.name === method)
+                                              updateFixedCost(cost.id, { method, loanId: linkedLoan?.id || undefined })
+                                            }}
+                                          >
+                                            {allPaymentMethods.map((method) => <option key={method}>{method}</option>)}
+                                          </select>
+                                        </label>
+                                        <div className="full-span" style={{ display: 'flex', gap: 12 }}>
+                                          <label className="check-label" style={{ flex: 1 }}>
+                                            <input
+                                              type="checkbox"
+                                              checked={cost.isInvestment ?? false}
+                                              onChange={(e) => updateFixedCost(cost.id, { isInvestment: e.target.checked })}
+                                            />
+                                            <span>投資・自己成長</span>
+                                          </label>
+                                          <label className="check-label" style={{ flex: 1 }}>
+                                            <input
+                                              type="checkbox"
+                                              checked={cost.noAlternative ?? false}
+                                              onChange={(e) => updateFixedCost(cost.id, { noAlternative: e.target.checked })}
+                                            />
+                                            <span>代替手段なし</span>
+                                          </label>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          </div>
+                        )
+                      })}
                       {data.fixedCosts.length === 0 && (
                         <p className="empty-text">固定費がまだありません</p>
                       )}
