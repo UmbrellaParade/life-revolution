@@ -12,9 +12,11 @@ Life Revolution is the WordPress plugin package for the Umbrella Parade Life Rev
 == Installation ==
 1. Upload the plugin ZIP from the WordPress Plugins screen, or copy the yutori-ledger folder into wp-content/plugins.
 2. Activate Life Revolution.
-3. Add the shortcode [life_revolution] to a public page.
+3. Open Life Revolution from the WordPress admin menu for private use.
 
-The legacy shortcode [yutori_ledger] still works for existing pages.
+Public users can use the GitHub Pages version at https://umbrellaparade.github.io/life-revolution/.
+
+The optional public shortcode [life_revolution] and legacy shortcode [yutori_ledger] remain available for existing pages.
 
 The plugin also adds a Life Revolution item to the WordPress admin menu.
 
