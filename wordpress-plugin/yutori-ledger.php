@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution
  * Description: Adds the Umbrella Parade Life Revolution budgeting tool to WordPress with the [life_revolution] shortcode.
- * Version: 0.2.0
+ * Version: 0.2.1
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('YUTORI_LEDGER_VERSION', '0.2.0');
+define('YUTORI_LEDGER_VERSION', '0.2.1');
 define('YUTORI_LEDGER_PATH', plugin_dir_path(__FILE__));
 define('YUTORI_LEDGER_URL', plugin_dir_url(__FILE__));
 define('YUTORI_LEDGER_FRONTEND_PAGE_OPTION', 'life_revolution_frontend_page_id');
@@ -279,6 +279,62 @@ add_action('admin_menu', 'yutori_ledger_register_admin_page');
 function yutori_ledger_enqueue_admin_assets($hook_suffix) {
     if ('toplevel_page_life-revolution' === $hook_suffix) {
         yutori_ledger_enqueue_app('private');
+
+        $mobile_app_css = <<<'CSS'
+@media screen and (max-width: 782px) {
+    html.wp-toolbar {
+        padding-top: 0 !important;
+    }
+
+    body.toplevel_page_life-revolution {
+        background: #f6f7f2 !important;
+        min-width: 320px;
+        overflow-x: hidden;
+    }
+
+    body.toplevel_page_life-revolution #wpadminbar,
+    body.toplevel_page_life-revolution #adminmenumain,
+    body.toplevel_page_life-revolution #wpfooter,
+    body.toplevel_page_life-revolution #screen-meta,
+    body.toplevel_page_life-revolution #screen-meta-links,
+    body.toplevel_page_life-revolution .update-nag,
+    body.toplevel_page_life-revolution .notice,
+    body.toplevel_page_life-revolution .updated,
+    body.toplevel_page_life-revolution .error {
+        display: none !important;
+    }
+
+    body.toplevel_page_life-revolution #wpwrap,
+    body.toplevel_page_life-revolution #wpcontent,
+    body.toplevel_page_life-revolution #wpbody,
+    body.toplevel_page_life-revolution #wpbody-content {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+
+    body.toplevel_page_life-revolution #wpbody-content {
+        float: none !important;
+        min-height: 100svh;
+    }
+
+    body.toplevel_page_life-revolution .life-revolution-admin-page {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    body.toplevel_page_life-revolution .life-revolution-admin-heading,
+    body.toplevel_page_life-revolution .life-revolution-admin-description {
+        display: none !important;
+    }
+
+    body.toplevel_page_life-revolution .yutori-ledger-root {
+        min-height: 100svh;
+    }
+}
+CSS;
+
+        wp_add_inline_style('yutori-ledger-app', $mobile_app_css);
     }
 }
 add_action('admin_enqueue_scripts', 'yutori_ledger_enqueue_admin_assets');
@@ -288,9 +344,9 @@ function yutori_ledger_render_admin_page() {
         wp_die(esc_html__('You do not have permission to use Life Revolution.', 'life-revolution'));
     }
 
-    echo '<div class="wrap">';
-    echo '<h1>' . esc_html__('Life Revolution', 'life-revolution') . '</h1>';
-    echo '<p class="description">' . esc_html__('この管理画面のデータはWordPressに保存され、公開版とは分離されています。', 'life-revolution') . '</p>';
+    echo '<div class="wrap life-revolution-admin-page">';
+    echo '<h1 class="life-revolution-admin-heading">' . esc_html__('Life Revolution', 'life-revolution') . '</h1>';
+    echo '<p class="description life-revolution-admin-description">' . esc_html__('この管理画面のデータはWordPressに保存され、公開版とは分離されています。', 'life-revolution') . '</p>';
     echo yutori_ledger_config_script('private');
     echo '<div class="life-revolution-root yutori-ledger-root" data-life-revolution-root data-yutori-ledger-root></div>';
     echo '</div>';
