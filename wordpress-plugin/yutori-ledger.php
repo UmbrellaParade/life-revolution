@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution
  * Description: Adds the Umbrella Parade Life Revolution budgeting tool to WordPress with the [life_revolution] shortcode.
- * Version: 0.3.1
+ * Version: 0.3.2
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('YUTORI_LEDGER_VERSION', '0.3.1');
+define('YUTORI_LEDGER_VERSION', '0.3.2');
 define('YUTORI_LEDGER_PATH', plugin_dir_path(__FILE__));
 define('YUTORI_LEDGER_URL', plugin_dir_url(__FILE__));
 define('YUTORI_LEDGER_FRONTEND_PAGE_OPTION', 'life_revolution_frontend_page_id');
@@ -70,7 +70,16 @@ function yutori_ledger_grant_administrator_capability(array $allcaps): array {
 add_filter('user_has_cap', 'yutori_ledger_grant_administrator_capability');
 
 function yutori_ledger_can_use_private(): bool {
-    return is_user_logged_in() && current_user_can(YUTORI_LEDGER_USE_CAPABILITY);
+    if (!is_user_logged_in()) {
+        return false;
+    }
+
+    $user = wp_get_current_user();
+    $has_member_role = in_array(YUTORI_LEDGER_MEMBER_ROLE, (array) $user->roles, true);
+
+    return $has_member_role
+        || current_user_can(YUTORI_LEDGER_USE_CAPABILITY)
+        || current_user_can('manage_options');
 }
 
 function yutori_ledger_find_asset($pattern) {
@@ -318,10 +327,14 @@ function yutori_ledger_find_frontend_page_id(): int {
 }
 
 function yutori_ledger_register_admin_page() {
+    if (!yutori_ledger_can_use_private()) {
+        return;
+    }
+
     add_menu_page(
         __('Life Revolution', 'life-revolution'),
         __('Life Revolution', 'life-revolution'),
-        YUTORI_LEDGER_USE_CAPABILITY,
+        'read',
         'life-revolution',
         'yutori_ledger_render_admin_page',
         'dashicons-chart-line',
