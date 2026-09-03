@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution
  * Description: Adds the Umbrella Parade Life Revolution budgeting tool to WordPress with the [life_revolution] shortcode.
- * Version: 0.3.2
+ * Version: 0.4.0
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('YUTORI_LEDGER_VERSION', '0.3.2');
+define('YUTORI_LEDGER_VERSION', '0.4.0');
 define('YUTORI_LEDGER_PATH', plugin_dir_path(__FILE__));
 define('YUTORI_LEDGER_URL', plugin_dir_url(__FILE__));
 define('YUTORI_LEDGER_FRONTEND_PAGE_OPTION', 'life_revolution_frontend_page_id');
@@ -22,6 +22,7 @@ define('YUTORI_LEDGER_STATE_UPDATED_META_KEY', 'life_revolution_state_updated_at
 define('YUTORI_LEDGER_USE_CAPABILITY', 'use_life_revolution');
 define('YUTORI_LEDGER_MEMBER_ROLE', 'life_revolution_member');
 define('YUTORI_LEDGER_INSTALLED_VERSION_OPTION', 'life_revolution_installed_version');
+define('YUTORI_LEDGER_PRIVATE_QUERY_VAR', 'life_revolution_private');
 
 function yutori_ledger_ensure_roles(): void {
     $member_role = get_role(YUTORI_LEDGER_MEMBER_ROLE);
@@ -36,8 +37,13 @@ function yutori_ledger_ensure_roles(): void {
         );
     }
 
-    if ($member_role && !$member_role->has_cap(YUTORI_LEDGER_USE_CAPABILITY)) {
-        $member_role->add_cap(YUTORI_LEDGER_USE_CAPABILITY);
+    if ($member_role) {
+        if (!$member_role->has_cap('read')) {
+            $member_role->add_cap('read');
+        }
+        if (!$member_role->has_cap(YUTORI_LEDGER_USE_CAPABILITY)) {
+            $member_role->add_cap(YUTORI_LEDGER_USE_CAPABILITY);
+        }
     }
 
     $administrator = get_role('administrator');
@@ -50,12 +56,16 @@ function yutori_ledger_ensure_roles(): void {
 
 function yutori_ledger_activate(): void {
     yutori_ledger_ensure_roles();
+    yutori_ledger_register_private_route();
+    flush_rewrite_rules(false);
 }
 register_activation_hook(__FILE__, 'yutori_ledger_activate');
 
 function yutori_ledger_maybe_upgrade(): void {
     if (get_option(YUTORI_LEDGER_INSTALLED_VERSION_OPTION) !== YUTORI_LEDGER_VERSION) {
         yutori_ledger_ensure_roles();
+        yutori_ledger_register_private_route();
+        flush_rewrite_rules(false);
     }
 }
 add_action('admin_init', 'yutori_ledger_maybe_upgrade');
@@ -81,6 +91,78 @@ function yutori_ledger_can_use_private(): bool {
         || current_user_can(YUTORI_LEDGER_USE_CAPABILITY)
         || current_user_can('manage_options');
 }
+
+function yutori_ledger_register_private_route(): void {
+    add_rewrite_rule(
+        '^my-life-revolution/?$',
+        'index.php?' . YUTORI_LEDGER_PRIVATE_QUERY_VAR . '=1',
+        'top'
+    );
+}
+add_action('init', 'yutori_ledger_register_private_route');
+
+function yutori_ledger_private_query_vars(array $query_vars): array {
+    $query_vars[] = YUTORI_LEDGER_PRIVATE_QUERY_VAR;
+    return $query_vars;
+}
+add_filter('query_vars', 'yutori_ledger_private_query_vars');
+
+function yutori_ledger_private_url(): string {
+    return home_url('/my-life-revolution/');
+}
+
+function yutori_ledger_member_login_redirect($redirect_to, $requested_redirect_to, $user) {
+    if ($user instanceof WP_User && in_array(YUTORI_LEDGER_MEMBER_ROLE, (array) $user->roles, true)) {
+        return yutori_ledger_private_url();
+    }
+
+    return $redirect_to;
+}
+add_filter('login_redirect', 'yutori_ledger_member_login_redirect', 10, 3);
+
+function yutori_ledger_render_private_frontend(): void {
+    if (!get_query_var(YUTORI_LEDGER_PRIVATE_QUERY_VAR)) {
+        return;
+    }
+
+    if (!is_user_logged_in()) {
+        auth_redirect();
+        exit;
+    }
+
+    if (!yutori_ledger_can_use_private()) {
+        wp_die(
+            esc_html__('You do not have permission to use Life Revolution.', 'life-revolution'),
+            esc_html__('Life Revolution', 'life-revolution'),
+            array('response' => 403)
+        );
+    }
+
+    show_admin_bar(false);
+    nocache_headers();
+    header('X-Robots-Tag: noindex, nofollow', true);
+    yutori_ledger_enqueue_app('private');
+    ?>
+    <!doctype html>
+    <html <?php language_attributes(); ?>>
+    <head>
+        <meta charset="<?php bloginfo('charset'); ?>">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+        <title><?php esc_html_e('Life Revolution', 'life-revolution'); ?></title>
+        <style>html,body{margin:0!important;padding:0!important;min-width:320px;background:#f6f7f2!important}body{min-height:100svh;overflow-x:hidden}.life-revolution-private-shell{min-height:100svh}</style>
+        <?php wp_head(); ?>
+    </head>
+    <body class="life-revolution-private-page">
+        <main class="life-revolution-private-shell">
+            <div class="life-revolution-root yutori-ledger-root" data-life-revolution-root data-yutori-ledger-root></div>
+        </main>
+        <?php wp_footer(); ?>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+add_action('template_redirect', 'yutori_ledger_render_private_frontend', 0);
 
 function yutori_ledger_find_asset($pattern) {
     $files = glob(YUTORI_LEDGER_PATH . 'assets/' . $pattern);
