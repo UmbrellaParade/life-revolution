@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution Family
  * Description: Combines two private Life Revolution ledgers into a household dashboard.
- * Version: 0.1.1
+ * Version: 0.2.0
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution-family
@@ -13,15 +13,22 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LIFE_REVOLUTION_FAMILY_VERSION', '0.1.1');
+define('LIFE_REVOLUTION_FAMILY_VERSION', '0.2.0');
 define('LIFE_REVOLUTION_FAMILY_CAPABILITY', 'view_life_revolution_family');
 define('LIFE_REVOLUTION_FAMILY_MEMBERS_OPTION', 'life_revolution_family_members_v1');
 define('LIFE_REVOLUTION_FAMILY_VERSION_OPTION', 'life_revolution_family_installed_version');
+define('LIFE_REVOLUTION_FAMILY_MEMBER_ROLE', 'life_revolution_member');
+define('LIFE_REVOLUTION_FAMILY_QUERY_VAR', 'life_revolution_family_private');
 
 function life_revolution_family_ensure_capability(): void {
     $administrator = get_role('administrator');
     if ($administrator && !$administrator->has_cap(LIFE_REVOLUTION_FAMILY_CAPABILITY)) {
         $administrator->add_cap(LIFE_REVOLUTION_FAMILY_CAPABILITY);
+    }
+
+    $member_role = get_role(LIFE_REVOLUTION_FAMILY_MEMBER_ROLE);
+    if ($member_role && !$member_role->has_cap(LIFE_REVOLUTION_FAMILY_CAPABILITY)) {
+        $member_role->add_cap(LIFE_REVOLUTION_FAMILY_CAPABILITY);
     }
 
     update_option(
@@ -33,21 +40,42 @@ function life_revolution_family_ensure_capability(): void {
 
 function life_revolution_family_activate(): void {
     life_revolution_family_ensure_capability();
+    life_revolution_family_register_private_route();
+    flush_rewrite_rules(false);
 }
 register_activation_hook(__FILE__, 'life_revolution_family_activate');
 
 function life_revolution_family_maybe_upgrade(): void {
     if (get_option(LIFE_REVOLUTION_FAMILY_VERSION_OPTION) !== LIFE_REVOLUTION_FAMILY_VERSION) {
         life_revolution_family_ensure_capability();
+        life_revolution_family_register_private_route();
+        flush_rewrite_rules(false);
     }
 }
 add_action('admin_init', 'life_revolution_family_maybe_upgrade');
 
+function life_revolution_family_can_view(): bool {
+    if (!is_user_logged_in()) {
+        return false;
+    }
+
+    $user = wp_get_current_user();
+    $is_member = in_array(LIFE_REVOLUTION_FAMILY_MEMBER_ROLE, (array) $user->roles, true);
+
+    return $is_member
+        || current_user_can(LIFE_REVOLUTION_FAMILY_CAPABILITY)
+        || current_user_can('manage_options');
+}
+
 function life_revolution_family_register_menu(): void {
+    if (!life_revolution_family_can_view()) {
+        return;
+    }
+
     add_menu_page(
         __('夫婦合算', 'life-revolution-family'),
         __('夫婦合算', 'life-revolution-family'),
-        LIFE_REVOLUTION_FAMILY_CAPABILITY,
+        'read',
         'life-revolution-family',
         'life_revolution_family_render_page',
         'dashicons-groups',
@@ -55,6 +83,82 @@ function life_revolution_family_register_menu(): void {
     );
 }
 add_action('admin_menu', 'life_revolution_family_register_menu');
+
+function life_revolution_family_register_private_route(): void {
+    add_rewrite_rule(
+        '^my-life-revolution-family/?$',
+        'index.php?' . LIFE_REVOLUTION_FAMILY_QUERY_VAR . '=1',
+        'top'
+    );
+}
+add_action('init', 'life_revolution_family_register_private_route');
+
+function life_revolution_family_query_vars(array $query_vars): array {
+    $query_vars[] = LIFE_REVOLUTION_FAMILY_QUERY_VAR;
+    return $query_vars;
+}
+add_filter('query_vars', 'life_revolution_family_query_vars');
+
+function life_revolution_family_private_url(): string {
+    return home_url('/my-life-revolution-family/');
+}
+
+function life_revolution_family_login_redirect($redirect_to, $requested_redirect_to, $user) {
+    if (!$user instanceof WP_User || !in_array(LIFE_REVOLUTION_FAMILY_MEMBER_ROLE, (array) $user->roles, true)) {
+        return $redirect_to;
+    }
+
+    $requested = wp_validate_redirect((string) $requested_redirect_to, '');
+    if ($requested && strpos($requested, life_revolution_family_private_url()) === 0) {
+        return $requested;
+    }
+
+    return $redirect_to;
+}
+add_filter('login_redirect', 'life_revolution_family_login_redirect', 20, 3);
+
+function life_revolution_family_render_private_frontend(): void {
+    if (!get_query_var(LIFE_REVOLUTION_FAMILY_QUERY_VAR)) {
+        return;
+    }
+
+    if (!is_user_logged_in()) {
+        auth_redirect();
+        exit;
+    }
+
+    if (!life_revolution_family_can_view()) {
+        wp_die(
+            esc_html__('この画面を表示する権限がありません。', 'life-revolution-family'),
+            esc_html__('Life Revolution Family', 'life-revolution-family'),
+            array('response' => 403)
+        );
+    }
+
+    show_admin_bar(false);
+    nocache_headers();
+    header('X-Robots-Tag: noindex, nofollow', true);
+    ?>
+    <!doctype html>
+    <html <?php language_attributes(); ?>>
+    <head>
+        <meta charset="<?php bloginfo('charset'); ?>">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+        <title><?php esc_html_e('Life Revolution Family', 'life-revolution-family'); ?></title>
+        <style>html,body{margin:0!important;padding:0!important;min-width:320px;background:#f6f7f2!important}body{min-height:100svh;overflow-x:hidden}.lrf-private-shell{min-height:100svh}</style>
+        <?php wp_head(); ?>
+    </head>
+    <body class="life-revolution-family-private-page">
+        <main class="lrf-private-shell">
+            <?php life_revolution_family_render_page(); ?>
+        </main>
+        <?php wp_footer(); ?>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+add_action('template_redirect', 'life_revolution_family_render_private_frontend', 0);
 
 function life_revolution_family_member_ids(): array {
     $stored = get_option(LIFE_REVOLUTION_FAMILY_MEMBERS_OPTION, array());
@@ -69,7 +173,7 @@ function life_revolution_family_member_ids(): array {
 }
 
 function life_revolution_family_save_members(): void {
-    if (!current_user_can(LIFE_REVOLUTION_FAMILY_CAPABILITY)) {
+    if (!current_user_can('manage_options')) {
         wp_die(esc_html__('この設定を変更する権限がありません。', 'life-revolution-family'));
     }
 
@@ -289,11 +393,13 @@ function life_revolution_family_render_breakdown(string $title, array $values, f
 }
 
 function life_revolution_family_render_page(): void {
-    if (!current_user_can(LIFE_REVOLUTION_FAMILY_CAPABILITY)) {
+    if (!life_revolution_family_can_view()) {
         wp_die(esc_html__('この画面を表示する権限がありません。', 'life-revolution-family'));
     }
 
     $month = life_revolution_family_month();
+    $can_manage = current_user_can('manage_options');
+    $is_private_frontend = (bool) get_query_var(LIFE_REVOLUTION_FAMILY_QUERY_VAR);
     $member_ids = life_revolution_family_member_ids();
     $summaries = array_map(
         static function ($user_id) use ($month) {
@@ -302,8 +408,10 @@ function life_revolution_family_render_page(): void {
         $member_ids
     );
     $combined = life_revolution_family_combine($summaries);
-    $users = get_users(array('orderby' => 'display_name', 'order' => 'ASC'));
-    $base_url = add_query_arg('page', 'life-revolution-family', admin_url('admin.php'));
+    $users = $can_manage ? get_users(array('orderby' => 'display_name', 'order' => 'ASC')) : array();
+    $base_url = $is_private_frontend
+        ? life_revolution_family_private_url()
+        : add_query_arg('page', 'life-revolution-family', admin_url('admin.php'));
     $previous_url = add_query_arg('lr_month', life_revolution_family_shift_month($month, -1), $base_url);
     $next_url = add_query_arg('lr_month', life_revolution_family_shift_month($month, 1), $base_url);
     ?>
@@ -331,8 +439,10 @@ function life_revolution_family_render_page(): void {
             <div class="lrf-notice lrf-setup-notice"><?php esc_html_e('現在は1人分です。下の「夫婦メンバー設定」で奥さまのWordPressアカウントを選ぶと合算が始まります。', 'life-revolution-family'); ?></div>
         <?php endif; ?>
 
-        <form class="lrf-month-control" method="get" action="<?php echo esc_url(admin_url('admin.php')); ?>">
-            <input type="hidden" name="page" value="life-revolution-family">
+        <form class="lrf-month-control" method="get" action="<?php echo esc_url($base_url); ?>">
+            <?php if (!$is_private_frontend) : ?>
+                <input type="hidden" name="page" value="life-revolution-family">
+            <?php endif; ?>
             <a href="<?php echo esc_url($previous_url); ?>" aria-label="<?php esc_attr_e('前の月', 'life-revolution-family'); ?>"><span class="dashicons dashicons-arrow-left-alt2"></span></a>
             <label>
                 <span><?php esc_html_e('表示月', 'life-revolution-family'); ?></span>
@@ -371,31 +481,33 @@ function life_revolution_family_render_page(): void {
             <?php life_revolution_family_render_breakdown(__('固定費ジャンル合算', 'life-revolution-family'), $combined['fixed_genres'], $combined['fixed_total']); ?>
         </div>
 
-        <details class="lrf-settings" <?php echo count($member_ids) < 2 ? 'open' : ''; ?>>
-            <summary><?php esc_html_e('夫婦メンバー設定', 'life-revolution-family'); ?></summary>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                <input type="hidden" name="action" value="life_revolution_family_save_members">
-                <?php wp_nonce_field('life_revolution_family_save_members'); ?>
-                <div class="lrf-member-selects">
-                    <?php for ($index = 0; $index < 2; $index++) : ?>
-                        <label>
-                            <span><?php echo esc_html($index === 0 ? __('メンバー1', 'life-revolution-family') : __('メンバー2', 'life-revolution-family')); ?></span>
-                            <select name="member_ids[]">
-                                <option value="0"><?php esc_html_e('選択してください', 'life-revolution-family'); ?></option>
-                                <?php foreach ($users as $user) : ?>
-                                    <option value="<?php echo esc_attr((string) $user->ID); ?>" <?php selected($member_ids[$index] ?? 0, $user->ID); ?>><?php echo esc_html($user->display_name . '（' . $user->user_login . '）'); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                    <?php endfor; ?>
-                </div>
-                <p class="lrf-help"><?php esc_html_e('奥さま用アカウントは「ユーザー → 新規追加」で、権限グループを「Life Revolution利用者」にして作成します。', 'life-revolution-family'); ?></p>
-                <div class="lrf-settings-actions">
-                    <?php submit_button(__('メンバーを保存', 'life-revolution-family'), 'primary', 'submit', false); ?>
-                    <a href="<?php echo esc_url(admin_url('user-new.php')); ?>"><?php esc_html_e('奥さま用アカウントを追加', 'life-revolution-family'); ?></a>
-                </div>
-            </form>
-        </details>
+        <?php if ($can_manage) : ?>
+            <details class="lrf-settings" <?php echo count($member_ids) < 2 ? 'open' : ''; ?>>
+                <summary><?php esc_html_e('夫婦メンバー設定', 'life-revolution-family'); ?></summary>
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                    <input type="hidden" name="action" value="life_revolution_family_save_members">
+                    <?php wp_nonce_field('life_revolution_family_save_members'); ?>
+                    <div class="lrf-member-selects">
+                        <?php for ($index = 0; $index < 2; $index++) : ?>
+                            <label>
+                                <span><?php echo esc_html($index === 0 ? __('メンバー1', 'life-revolution-family') : __('メンバー2', 'life-revolution-family')); ?></span>
+                                <select name="member_ids[]">
+                                    <option value="0"><?php esc_html_e('選択してください', 'life-revolution-family'); ?></option>
+                                    <?php foreach ($users as $user) : ?>
+                                        <option value="<?php echo esc_attr((string) $user->ID); ?>" <?php selected($member_ids[$index] ?? 0, $user->ID); ?>><?php echo esc_html($user->display_name . '（' . $user->user_login . '）'); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                        <?php endfor; ?>
+                    </div>
+                    <p class="lrf-help"><?php esc_html_e('奥さま用アカウントは「ユーザー → 新規追加」で、権限グループを「Life Revolution利用者」にして作成します。', 'life-revolution-family'); ?></p>
+                    <div class="lrf-settings-actions">
+                        <?php submit_button(__('メンバーを保存', 'life-revolution-family'), 'primary', 'submit', false); ?>
+                        <a href="<?php echo esc_url(admin_url('user-new.php')); ?>"><?php esc_html_e('奥さま用アカウントを追加', 'life-revolution-family'); ?></a>
+                    </div>
+                </form>
+            </details>
+        <?php endif; ?>
     </div>
     <?php
 }
