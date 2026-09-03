@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution
  * Description: Adds the Umbrella Parade Life Revolution budgeting tool to WordPress with the [life_revolution] shortcode.
- * Version: 0.4.0
+ * Version: 0.4.1
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('YUTORI_LEDGER_VERSION', '0.4.0');
+define('YUTORI_LEDGER_VERSION', '0.4.1');
 define('YUTORI_LEDGER_PATH', plugin_dir_path(__FILE__));
 define('YUTORI_LEDGER_URL', plugin_dir_url(__FILE__));
 define('YUTORI_LEDGER_FRONTEND_PAGE_OPTION', 'life_revolution_frontend_page_id');
@@ -154,6 +154,7 @@ function yutori_ledger_render_private_frontend(): void {
     </head>
     <body class="life-revolution-private-page">
         <main class="life-revolution-private-shell">
+            <?php echo yutori_ledger_config_script('private'); ?>
             <div class="life-revolution-root yutori-ledger-root" data-life-revolution-root data-yutori-ledger-root></div>
         </main>
         <?php wp_footer(); ?>
