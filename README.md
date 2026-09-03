@@ -5,7 +5,8 @@ Umbrella Parade Life Revolution is a mobile-first budgeting and life-revolution 
 ## Public And Private Use
 
 - Public users use the GitHub Pages app at https://umbrellaparade.github.io/life-revolution/. Their data stays in their own browser.
-- The site administrator uses the Life Revolution screen in WordPress admin. Private data is stored in that administrator's WordPress user metadata.
+- WordPress users with the `Life Revolution利用者` role use the same private app while keeping separate user-metadata ledgers.
+- Administrators can install Life Revolution Family to combine two selected private ledgers in an admin-only household dashboard.
 - The optional `[life_revolution]` shortcode is also public/browser-only and never reads WordPress admin data.
 
 ## Development
@@ -35,11 +36,23 @@ The generated plugin folder is created at:
 wordpress-plugin/build/yutori-ledger
 ```
 
+Build both the main and family plugins with:
+
+```bash
+npm run build:wp:all
+```
+
+The family plugin folder is created at:
+
+```text
+wordpress-family-plugin/build/life-revolution-family
+```
+
 The folder and legacy shortcode stay `yutori-ledger` / `[yutori_ledger]` for compatibility with existing WordPress installs. The user-facing plugin name and preferred shortcode are:
 
 ```text
 [life_revolution]
 ```
 
-The GitHub Pages app and public shortcode store data in the visitor's browser localStorage. Use the app's JSON export/import controls before changing devices, browsers, or clearing browser data.
+The GitHub Pages app and public shortcode store data in the visitor's browser localStorage. Private WordPress browser caches are keyed by WordPress user ID, and the primary private copy remains in that user's WordPress metadata. Use the app's JSON export/import controls for additional backups.
 

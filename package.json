@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:wp": "npm run build && node scripts/build-wordpress-plugin.mjs",
+    "build:wp:family": "node scripts/build-wordpress-family-plugin.mjs",
+    "build:wp:all": "npm run build:wp && npm run build:wp:family",
     "lint": "eslint .",
     "preview": "vite preview"
   },
