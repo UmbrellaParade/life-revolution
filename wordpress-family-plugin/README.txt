@@ -4,7 +4,7 @@ Tags: budgeting, household, family, dashboard
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.1.1
 License: GPL-2.0-or-later
 
 Life Revolution Family combines two private Life Revolution user ledgers into one household dashboard.
@@ -20,4 +20,3 @@ The combined dashboard is available only to administrators with the Life Revolut
 
 == Data ==
 This plugin reads each selected member's private Life Revolution user metadata. It does not copy, move, or delete either member's original ledger.
-
