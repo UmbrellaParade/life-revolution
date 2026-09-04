@@ -4,7 +4,7 @@ Tags: budgeting, household, family, dashboard
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPL-2.0-or-later
 
 Life Revolution Family combines two private Life Revolution user ledgers into one household dashboard.
@@ -22,3 +22,5 @@ Members can open the mobile-friendly private dashboard at /my-life-revolution-fa
 
 == Data ==
 This plugin reads each selected member's private Life Revolution user metadata. It does not copy, move, or delete either member's original ledger.
+
+Month-specific living allowances are shown as transfers within the household. They are included in the recipient's personal remaining amount but are not counted again as household income.

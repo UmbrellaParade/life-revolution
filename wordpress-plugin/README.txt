@@ -4,7 +4,7 @@ Tags: budgeting, savings, ledger, react
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 0.4.1
+Stable tag: 0.4.2
 License: GPL-2.0-or-later
 
 Life Revolution is the WordPress plugin package for the Umbrella Parade Life Revolution budgeting tool.
@@ -15,6 +15,8 @@ Life Revolution is the WordPress plugin package for the Umbrella Parade Life Rev
 3. Open Life Revolution from the WordPress admin menu for private use.
 
 Administrators can create a separate WordPress account with the "Life Revolution利用者" role. Each account sees the same app but keeps an independent private ledger.
+
+The monthly dashboard includes a month-specific "生活費（受取）" amount. It is added to that member's available amount while remaining identifiable as a household transfer in Life Revolution Family.
 
 Dedicated members sign in at /my-life-revolution/. The route requires a logged-in Life Revolution member and does not expose private data publicly.
 

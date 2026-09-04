@@ -236,6 +236,10 @@ main {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.settings-grid .living-allowance-field {
+  grid-column: 2;
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -979,6 +983,10 @@ button {
   .simulator,
   .edit-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-grid .living-allowance-field {
+    grid-column: auto;
   }
 
   .month-control {

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution Family
  * Description: Combines two private Life Revolution ledgers into a household dashboard.
- * Version: 0.2.0
+ * Version: 0.2.1
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution-family
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LIFE_REVOLUTION_FAMILY_VERSION', '0.2.0');
+define('LIFE_REVOLUTION_FAMILY_VERSION', '0.2.1');
 define('LIFE_REVOLUTION_FAMILY_CAPABILITY', 'view_life_revolution_family');
 define('LIFE_REVOLUTION_FAMILY_MEMBERS_OPTION', 'life_revolution_family_members_v1');
 define('LIFE_REVOLUTION_FAMILY_VERSION_OPTION', 'life_revolution_family_installed_version');
@@ -312,8 +312,13 @@ function life_revolution_family_summary(int $user_id, string $month): array {
     }
 
     $income = life_revolution_family_number($settings['monthlyIncome'] ?? 0);
+    $living_allowances = isset($settings['livingAllowanceByMonth']) && is_array($settings['livingAllowanceByMonth'])
+        ? $settings['livingAllowanceByMonth']
+        : array();
+    $living_allowance = life_revolution_family_number($living_allowances[$month] ?? 0);
     $buffer = life_revolution_family_number($settings['bufferTarget'] ?? 0);
     $planned_outflow = $expense_total + $fixed_total + $loan_payment_total + $buffer;
+    $personal_remaining = $income + $living_allowance - $planned_outflow;
 
     arsort($categories);
     arsort($fixed_genres);
@@ -324,6 +329,7 @@ function life_revolution_family_summary(int $user_id, string $month): array {
         'has_data' => !empty($state),
         'updated_at' => (string) get_user_meta($user_id, life_revolution_family_updated_meta_key(), true),
         'income' => $income,
+        'living_allowance' => $living_allowance,
         'expense_total' => $expense_total,
         'expense_count' => $expense_count,
         'fixed_total' => $fixed_total,
@@ -331,6 +337,7 @@ function life_revolution_family_summary(int $user_id, string $month): array {
         'buffer' => $buffer,
         'planned_outflow' => $planned_outflow,
         'remaining' => $income - $planned_outflow,
+        'personal_remaining' => $personal_remaining,
         'debt_total' => $debt_total,
         'saved_total' => $saved_total,
         'categories' => $categories,
@@ -341,6 +348,7 @@ function life_revolution_family_summary(int $user_id, string $month): array {
 function life_revolution_family_combine(array $summaries): array {
     $combined = array(
         'income' => 0.0,
+        'living_allowance' => 0.0,
         'expense_total' => 0.0,
         'expense_count' => 0,
         'fixed_total' => 0.0,
@@ -355,7 +363,7 @@ function life_revolution_family_combine(array $summaries): array {
     );
 
     foreach ($summaries as $summary) {
-        foreach (array('income', 'expense_total', 'fixed_total', 'loan_payment_total', 'buffer', 'planned_outflow', 'remaining', 'debt_total', 'saved_total') as $key) {
+        foreach (array('income', 'living_allowance', 'expense_total', 'fixed_total', 'loan_payment_total', 'buffer', 'planned_outflow', 'remaining', 'debt_total', 'saved_total') as $key) {
             $combined[$key] += (float) $summary[$key];
         }
         $combined['expense_count'] += (int) $summary['expense_count'];
@@ -417,7 +425,7 @@ function life_revolution_family_render_page(): void {
     ?>
     <div class="wrap lrf-wrap">
         <style>
-            .lrf-wrap{max-width:1080px;color:#16231f;letter-spacing:0}.lrf-title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:22px 0 18px}.lrf-title-row h1{margin:0;font-size:28px;line-height:1.25}.lrf-title-row p{margin:4px 0 0;color:#5d6b66}.lrf-month-control{display:grid;grid-template-columns:44px minmax(180px,320px) 44px;align-items:end;justify-content:center;gap:10px;margin:0 0 20px}.lrf-month-control a{display:grid;place-items:center;width:42px;height:42px;border:1px solid #ccd6d1;border-radius:6px;background:#fff;color:#175f4c;text-decoration:none}.lrf-month-control label{display:grid;gap:5px;font-weight:700}.lrf-month-control input{height:42px;border-color:#b8c6c0}.lrf-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}.lrf-metric{padding:18px;border:1px solid #dbe2de;border-radius:8px;background:#fff;box-shadow:0 5px 18px rgba(24,49,40,.05)}.lrf-metric span{display:block;color:#64716c;font-weight:650;font-size:13px}.lrf-metric strong{display:block;margin-top:8px;font-size:25px;line-height:1.15}.lrf-metric-primary{background:#edf8f3;border-color:#b9dbce}.lrf-metric-warn strong{color:#a13c3c}.lrf-members{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px}.lrf-member{border:1px solid #dbe2de;border-radius:8px;background:#fff;padding:18px}.lrf-member-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.lrf-member-header h2{margin:0;font-size:19px}.lrf-member-header small{color:#6d7874}.lrf-member dl{display:grid;grid-template-columns:1fr auto;gap:9px 12px;margin:0}.lrf-member dt{color:#5f6d68}.lrf-member dd{margin:0;font-weight:750}.lrf-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px}.lrf-panel{border-top:3px solid #21775f;background:#fff;padding:18px;border-radius:0 0 8px 8px}.lrf-panel-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.lrf-panel-heading h2{margin:0;font-size:18px}.lrf-panel-heading strong{font-size:18px}.lrf-breakdown{display:grid;gap:13px}.lrf-breakdown-row>div{display:flex;justify-content:space-between;gap:12px;margin-bottom:5px}.lrf-bar{display:block;height:7px;background:#edf1ef;border-radius:4px;overflow:hidden}.lrf-bar i{display:block;height:100%;background:#d1b45d}.lrf-empty{color:#727d79}.lrf-settings{background:#fff;border:1px solid #dbe2de;border-radius:8px;padding:0 18px}.lrf-settings summary{cursor:pointer;font-weight:750;padding:17px 0}.lrf-settings form{display:grid;gap:13px;padding:0 0 18px}.lrf-member-selects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.lrf-member-selects label{display:grid;gap:5px;font-weight:700}.lrf-member-selects select{width:100%;max-width:none}.lrf-help{color:#5f6d68;margin:0}.lrf-notice{padding:12px 14px;border-left:4px solid #d1b45d;background:#fff9df;margin-bottom:16px}.lrf-settings-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}@media(max-width:782px){html.wp-toolbar{padding-top:0!important}body.toplevel_page_life-revolution-family{background:#f6f7f2!important;min-width:320px;overflow-x:hidden}body.toplevel_page_life-revolution-family #wpadminbar,body.toplevel_page_life-revolution-family #adminmenumain,body.toplevel_page_life-revolution-family #wpfooter,body.toplevel_page_life-revolution-family #screen-meta,body.toplevel_page_life-revolution-family #screen-meta-links,body.toplevel_page_life-revolution-family .update-nag,body.toplevel_page_life-revolution-family .notice,body.toplevel_page_life-revolution-family .updated,body.toplevel_page_life-revolution-family .error{display:none!important}body.toplevel_page_life-revolution-family #wpwrap,body.toplevel_page_life-revolution-family #wpcontent,body.toplevel_page_life-revolution-family #wpbody,body.toplevel_page_life-revolution-family #wpbody-content{margin:0!important;padding:0!important;width:100%!important}body.toplevel_page_life-revolution-family #wpbody-content{float:none!important;min-height:100svh}.lrf-wrap{margin:0;padding:14px 14px 90px}.lrf-title-row{margin-top:0}.lrf-title-row h1{font-size:23px}.lrf-setup-notice{display:none}.lrf-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lrf-members,.lrf-panels,.lrf-member-selects{grid-template-columns:1fr}.lrf-metric{padding:14px}.lrf-metric strong{font-size:21px}.lrf-month-control{grid-template-columns:42px minmax(0,1fr) 42px}}
+            .lrf-wrap{max-width:1080px;color:#16231f;letter-spacing:0}.lrf-title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:22px 0 18px}.lrf-title-row h1{margin:0;font-size:28px;line-height:1.25}.lrf-title-row p{margin:4px 0 0;color:#5d6b66}.lrf-month-control{display:grid;grid-template-columns:44px minmax(180px,320px) 44px;align-items:end;justify-content:center;gap:10px;margin:0 0 20px}.lrf-month-control a{display:grid;place-items:center;width:42px;height:42px;border:1px solid #ccd6d1;border-radius:6px;background:#fff;color:#175f4c;text-decoration:none}.lrf-month-control label{display:grid;gap:5px;font-weight:700}.lrf-month-control input{height:42px;border-color:#b8c6c0}.lrf-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:20px}.lrf-metric{padding:18px;border:1px solid #dbe2de;border-radius:8px;background:#fff;box-shadow:0 5px 18px rgba(24,49,40,.05)}.lrf-metric span{display:block;color:#64716c;font-weight:650;font-size:13px}.lrf-metric strong{display:block;margin-top:8px;font-size:25px;line-height:1.15}.lrf-metric-primary{background:#edf8f3;border-color:#b9dbce}.lrf-metric-warn strong{color:#a13c3c}.lrf-members{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px}.lrf-member{border:1px solid #dbe2de;border-radius:8px;background:#fff;padding:18px}.lrf-member-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.lrf-member-header h2{margin:0;font-size:19px}.lrf-member-header small{color:#6d7874}.lrf-member dl{display:grid;grid-template-columns:1fr auto;gap:9px 12px;margin:0}.lrf-member dt{color:#5f6d68}.lrf-member dd{margin:0;font-weight:750}.lrf-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:20px}.lrf-panel{border-top:3px solid #21775f;background:#fff;padding:18px;border-radius:0 0 8px 8px}.lrf-panel-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.lrf-panel-heading h2{margin:0;font-size:18px}.lrf-panel-heading strong{font-size:18px}.lrf-breakdown{display:grid;gap:13px}.lrf-breakdown-row>div{display:flex;justify-content:space-between;gap:12px;margin-bottom:5px}.lrf-bar{display:block;height:7px;background:#edf1ef;border-radius:4px;overflow:hidden}.lrf-bar i{display:block;height:100%;background:#d1b45d}.lrf-empty{color:#727d79}.lrf-settings{background:#fff;border:1px solid #dbe2de;border-radius:8px;padding:0 18px}.lrf-settings summary{cursor:pointer;font-weight:750;padding:17px 0}.lrf-settings form{display:grid;gap:13px;padding:0 0 18px}.lrf-member-selects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.lrf-member-selects label{display:grid;gap:5px;font-weight:700}.lrf-member-selects select{width:100%;max-width:none}.lrf-help{color:#5f6d68;margin:0}.lrf-notice{padding:12px 14px;border-left:4px solid #d1b45d;background:#fff9df;margin-bottom:16px}.lrf-settings-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}@media(max-width:782px){html.wp-toolbar{padding-top:0!important}body.toplevel_page_life-revolution-family{background:#f6f7f2!important;min-width:320px;overflow-x:hidden}body.toplevel_page_life-revolution-family #wpadminbar,body.toplevel_page_life-revolution-family #adminmenumain,body.toplevel_page_life-revolution-family #wpfooter,body.toplevel_page_life-revolution-family #screen-meta,body.toplevel_page_life-revolution-family #screen-meta-links,body.toplevel_page_life-revolution-family .update-nag,body.toplevel_page_life-revolution-family .notice,body.toplevel_page_life-revolution-family .updated,body.toplevel_page_life-revolution-family .error{display:none!important}body.toplevel_page_life-revolution-family #wpwrap,body.toplevel_page_life-revolution-family #wpcontent,body.toplevel_page_life-revolution-family #wpbody,body.toplevel_page_life-revolution-family #wpbody-content{margin:0!important;padding:0!important;width:100%!important}body.toplevel_page_life-revolution-family #wpbody-content{float:none!important;min-height:100svh}.lrf-wrap{margin:0;padding:14px 14px 90px}.lrf-title-row{margin-top:0}.lrf-title-row h1{font-size:23px}.lrf-setup-notice{display:none}.lrf-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lrf-members,.lrf-panels,.lrf-member-selects{grid-template-columns:1fr}.lrf-metric{padding:14px}.lrf-metric strong{font-size:21px}.lrf-month-control{grid-template-columns:42px minmax(0,1fr) 42px}}
         </style>
 
         <div class="lrf-title-row">
@@ -453,6 +461,7 @@ function life_revolution_family_render_page(): void {
 
         <section class="lrf-summary-grid" aria-label="<?php esc_attr_e('夫婦合算サマリー', 'life-revolution-family'); ?>">
             <article class="lrf-metric lrf-metric-primary"><span><?php esc_html_e('世帯収入', 'life-revolution-family'); ?></span><strong><?php echo esc_html(life_revolution_family_money($combined['income'])); ?></strong></article>
+            <article class="lrf-metric"><span><?php esc_html_e('生活費（世帯内移動）', 'life-revolution-family'); ?></span><strong><?php echo esc_html(life_revolution_family_money($combined['living_allowance'])); ?></strong></article>
             <article class="lrf-metric"><span><?php esc_html_e('登録支出', 'life-revolution-family'); ?></span><strong><?php echo esc_html(life_revolution_family_money($combined['expense_total'])); ?></strong></article>
             <article class="lrf-metric"><span><?php esc_html_e('固定費・返済', 'life-revolution-family'); ?></span><strong><?php echo esc_html(life_revolution_family_money($combined['fixed_total'] + $combined['loan_payment_total'])); ?></strong></article>
             <article class="lrf-metric <?php echo $combined['remaining'] < 0 ? 'lrf-metric-warn' : ''; ?>"><span><?php esc_html_e('見込み残り', 'life-revolution-family'); ?></span><strong><?php echo esc_html(life_revolution_family_money($combined['remaining'])); ?></strong></article>
@@ -467,10 +476,11 @@ function life_revolution_family_render_page(): void {
                     </div>
                     <dl>
                         <dt><?php esc_html_e('収入', 'life-revolution-family'); ?></dt><dd><?php echo esc_html(life_revolution_family_money($summary['income'])); ?></dd>
+                        <dt><?php esc_html_e('生活費受取', 'life-revolution-family'); ?></dt><dd><?php echo esc_html(life_revolution_family_money($summary['living_allowance'])); ?></dd>
                         <dt><?php esc_html_e('登録支出', 'life-revolution-family'); ?></dt><dd><?php echo esc_html(life_revolution_family_money($summary['expense_total'])); ?></dd>
                         <dt><?php esc_html_e('固定費', 'life-revolution-family'); ?></dt><dd><?php echo esc_html(life_revolution_family_money($summary['fixed_total'])); ?></dd>
                         <dt><?php esc_html_e('返済', 'life-revolution-family'); ?></dt><dd><?php echo esc_html(life_revolution_family_money($summary['loan_payment_total'])); ?></dd>
-                        <dt><?php esc_html_e('見込み残り', 'life-revolution-family'); ?></dt><dd><?php echo esc_html(life_revolution_family_money($summary['remaining'])); ?></dd>
+                        <dt><?php esc_html_e('個人残り', 'life-revolution-family'); ?></dt><dd><?php echo esc_html(life_revolution_family_money($summary['personal_remaining'])); ?></dd>
                     </dl>
                 </article>
             <?php endforeach; ?>

@@ -100,6 +100,7 @@ type Loan = {
 type Settings = {
   monthlyIncome: number
   bufferTarget: number
+  livingAllowanceByMonth: Record<string, number>
   extraPayment?: number
   paymentCards: string[]
   repaymentTarget: string
@@ -220,6 +221,7 @@ const defaultData: AppData = {
   settings: {
     monthlyIncome: 0,
     bufferTarget: 0,
+    livingAllowanceByMonth: {},
     extraPayment: 0,
     paymentCards: [],
     repaymentTarget: '',
@@ -288,6 +290,25 @@ function clampPositive(value: number) {
 
 function clampDueDay(value: number) {
   return Math.min(Math.max(Number(value) || 1, 1), 31)
+}
+
+function normalizeMonthlyAmounts(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {} as Record<string, number>
+  }
+
+  return Object.entries(value).reduce<Record<string, number>>((amounts, [month, rawAmount]) => {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+      return amounts
+    }
+
+    const amount = clampPositive(Number(rawAmount))
+    if (amount > 0) {
+      amounts[month] = amount
+    }
+
+    return amounts
+  }, {})
 }
 
 function loanPayable(loan: Loan) {
@@ -396,6 +417,7 @@ function normalizeData(importedData: Partial<AppData>): AppData {
     settings: {
       monthlyIncome: Number(importedSettings.monthlyIncome) || 0,
       bufferTarget: Number(importedSettings.bufferTarget) || 0,
+      livingAllowanceByMonth: normalizeMonthlyAmounts(importedSettings.livingAllowanceByMonth),
       extraPayment: Number(importedSettings.extraPayment) || 0,
       paymentCards: Array.isArray(importedSettings.paymentCards) ? importedSettings.paymentCards : [],
       repaymentTarget: importedSettings.repaymentTarget || '',
@@ -422,6 +444,7 @@ function hasMeaningfulData(value: Partial<AppData>) {
       (value.cards?.length ?? 0) > 0 ||
       Number(settings.monthlyIncome) > 0 ||
       Number(settings.bufferTarget) > 0 ||
+      Object.values(settings.livingAllowanceByMonth ?? {}).some((amount) => Number(amount) > 0) ||
       Number(settings.extraPayment) > 0 ||
       Boolean(settings.repaymentTarget) ||
       Number(settings.repaymentMonthlyTarget) > 0
@@ -910,6 +933,8 @@ function App() {
   }, [data.fixedCosts])
 
   const totals = useMemo(() => {
+    const livingAllowance = data.settings.livingAllowanceByMonth[selectedMonth] ?? 0
+    const availableIncome = data.settings.monthlyIncome + livingAllowance
     const variableSpent = monthlyExpenses.reduce(
       (sum, expense) => sum + expense.amount,
       0,
@@ -939,7 +964,7 @@ function App() {
       loanPaymentTotal +
       data.settings.bufferTarget +
       variableSpent
-    const remaining = data.settings.monthlyIncome - plannedOutflow
+    const remaining = availableIncome - plannedOutflow
     const targetLoan = data.settings.repaymentTarget
       ? data.loans.find((l) => l.name === data.settings.repaymentTarget)
       : null
@@ -967,6 +992,8 @@ function App() {
       debtTotal,
       projectedDebtTotal,
       weightedApr,
+      livingAllowance,
+      availableIncome,
       plannedOutflow,
       remaining,
       payoffMonths,
@@ -1022,6 +1049,27 @@ function App() {
         ...nextSettings,
       },
     }))
+  }
+
+  function updateLivingAllowance(month: string, amount: number) {
+    setData((current) => {
+      const livingAllowanceByMonth = { ...current.settings.livingAllowanceByMonth }
+      const normalizedAmount = clampPositive(amount)
+
+      if (normalizedAmount > 0) {
+        livingAllowanceByMonth[month] = normalizedAmount
+      } else {
+        delete livingAllowanceByMonth[month]
+      }
+
+      return {
+        ...current,
+        settings: {
+          ...current.settings,
+          livingAllowanceByMonth,
+        },
+      }
+    })
   }
 
   function changeSelectedMonth(month: string) {
@@ -1496,6 +1544,20 @@ function App() {
                   placeholder="10000"
                 />
               </label>
+              <label className="living-allowance-field">
+                <span>生活費（受取）</span>
+                <input
+                  inputMode="numeric"
+                  type="number"
+                  min="0"
+                  value={data.settings.livingAllowanceByMonth[selectedMonth] || ''}
+                  onFocus={(event) => event.target.select()}
+                  onChange={(event) =>
+                    updateLivingAllowance(selectedMonth, Number(event.target.value))
+                  }
+                  placeholder="50000"
+                />
+              </label>
             </div>
 
 
@@ -1515,6 +1577,14 @@ function App() {
               <div>
                 <span>支出込み合計</span>
                 <strong>{yen(totals.plannedOutflow)}</strong>
+              </div>
+              <div>
+                <span>生活費（受取）</span>
+                <strong>{yen(totals.livingAllowance)}</strong>
+              </div>
+              <div>
+                <span>利用可能額</span>
+                <strong>{yen(totals.availableIncome)}</strong>
               </div>
             </div>
 
