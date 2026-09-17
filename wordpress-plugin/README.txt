@@ -4,7 +4,7 @@ Tags: budgeting, savings, ledger, react
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 0.4.2
+Stable tag: 0.4.3
 License: GPL-2.0-or-later
 
 Life Revolution is the WordPress plugin package for the Umbrella Parade Life Revolution budgeting tool.
@@ -35,4 +35,6 @@ Use the app's JSON export/import controls before changing devices, browsers, or 
 
 == Maintenance ==
 This plugin is generated from the same React app used by the GitHub Pages version. When the app is changed, rebuild both the public app and the WordPress plugin package.
+
+Repayment simulation is available in the fixed costs and loans section. Trial monthly payments, extra payments, and immediate lump sums do not change saved ledger data. It compares all loans and provides monthly schedules, using monthly interest and whole-yen rounding. Contract-specific daily interest and early repayment fees are not included. For fixed interest totals, confirm the remaining unpaid interest before calculating.
 

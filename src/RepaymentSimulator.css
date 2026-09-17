@@ -1,0 +1,26 @@
+.repayment-simulator { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 20px; min-width: 0; }
+.repayment-simulator .panel-heading h3 { margin: 0; font-size: 18px; color: var(--ink) !important; }
+.repayment-controls { display: grid; grid-template-columns: minmax(0, 1fr) 42px; align-items: end; gap: 8px; }
+.repayment-controls label, .repayment-inputs label { min-width: 0; }
+.repayment-controls select { width: 100%; }
+.repayment-principal { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; }
+.repayment-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.repayment-inputs input { width: 100%; min-width: 0; }
+.repayment-assumptions { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 14px 0; }
+.repayment-table-scroll { overflow-x: auto; max-width: 100%; }
+.repayment-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.repayment-table caption { color: var(--ink); font-size: 14px; font-weight: 700; padding: 8px 0; text-align: left; }
+.repayment-table th, .repayment-table td { padding: 10px 6px; border-bottom: 1px solid var(--line); color: var(--ink) !important; text-align: right; overflow-wrap: anywhere; }
+.repayment-table th:first-child { text-align: left; width: 27%; }
+.repayment-table thead { background: var(--bg); }
+.repayment-table small { display: block; color: var(--muted); margin-top: 4px; }
+.repayment-difference { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 14px 0; color: var(--green); font-size: 13px; }
+.repayment-difference strong { display: block; font-size: 17px; }
+.repayment-results { list-style: none; padding: 0; margin: 12px 0; }
+.repayment-results li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 6px 12px; border-bottom: 1px solid var(--line); padding: 10px 0; font-size: 13px; overflow-wrap: anywhere; }
+.repayment-results span { text-align: right; }
+.repayment-results small { grid-column: 1 / -1; }
+.repayment-schedule summary { cursor: pointer; color: var(--ink); font-size: 14px; font-weight: 700; padding: 10px 0; }
+.repayment-schedule-table { min-width: 420px; }
+.repayment-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; padding-top: 10px; font-size: 13px; }
+@media (max-width: 480px) { .repayment-inputs { grid-template-columns: minmax(0, 1fr); } }

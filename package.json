@@ -10,9 +10,11 @@
     "build:wp:family": "node scripts/build-wordpress-family-plugin.mjs",
     "build:wp:all": "npm run build:wp && npm run build:wp:family",
     "lint": "eslint .",
+    "test": "node --test tests/*.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "financial": "^0.2.4",
     "lucide-react": "^0.468.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"

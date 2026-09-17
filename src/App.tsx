@@ -27,6 +27,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
+import RepaymentSimulator from './RepaymentSimulator'
 
 declare global {
   interface Window {
@@ -3285,6 +3286,8 @@ function App() {
                 </ul>
               </div>
             </div>
+
+            <RepaymentSimulator loans={data.loans} startMonth={selectedMonth} />
 
             {/* 予測ローン総額（目隠しボタン付き） */}
             <div className="import-panel" style={{ marginTop: 16 }}>
