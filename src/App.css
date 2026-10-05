@@ -577,6 +577,11 @@ button {
   color: #8a6200;
 }
 
+.funded-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
 .funded-badge {
   background: #fff7df;
   border: 1px solid #e0c060;
@@ -587,6 +592,17 @@ button {
   margin-left: 6px;
   padding: 1px 5px;
   vertical-align: middle;
+}
+
+.schedule-badge {
+  background: #eef1f3;
+  border: 1px solid #cfd6da;
+  border-radius: 4px;
+  color: #59666d;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 6px;
+  padding: 1px 5px;
 }
 
 .muted-text {

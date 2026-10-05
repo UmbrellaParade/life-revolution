@@ -4,7 +4,7 @@ Tags: budgeting, household, family, dashboard
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 0.2.1
+Stable tag: 0.2.2
 License: GPL-2.0-or-later
 
 Life Revolution Family combines two private Life Revolution user ledgers into one household dashboard.

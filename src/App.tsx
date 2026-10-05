@@ -28,6 +28,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import './App.css'
 import RepaymentSimulator from './RepaymentSimulator'
+import { clampDueMonth, fixedCostOccursInMonth } from './fixedCosts'
 
 declare global {
   interface Window {
@@ -68,6 +69,8 @@ type FixedCost = {
   name: string
   amount: number
   dueDay: number
+  billingCycle: 'monthly' | 'annual'
+  dueMonth: number
   method: string
   loanId?: string
   active: boolean
@@ -360,6 +363,10 @@ function normalizeData(importedData: Partial<AppData>): AppData {
       name: cost.name || '',
       amount: Number(cost.amount) || 0,
       dueDay: clampDueDay(cost.dueDay),
+      billingCycle: (cost.billingCycle === 'annual' ? 'annual' : 'monthly') as
+        | 'monthly'
+        | 'annual',
+      dueMonth: clampDueMonth(cost.dueMonth ?? 1),
       method: cost.method || paymentMethods[0],
       loanId: inferLoanId(cost, loans),
       active: cost.active ?? true,
@@ -588,6 +595,8 @@ function App() {
     name: '',
     amount: '',
     dueDay: '1',
+    billingCycle: 'monthly' as 'monthly' | 'annual',
+    dueMonth: String(Number(selectedMonth.slice(5, 7))),
     method: paymentMethods[0],
     loanId: '',
     genre: 'その他',
@@ -926,12 +935,12 @@ function App() {
 
   const loanFixedTotals = useMemo(() => {
     return data.fixedCosts.reduce<Record<string, number>>((totals, cost) => {
-      if (cost.active && cost.loanId) {
+      if (cost.active && cost.loanId && fixedCostOccursInMonth(cost, selectedMonth)) {
         totals[cost.loanId] = (totals[cost.loanId] ?? 0) + cost.amount
       }
       return totals
     }, {})
-  }, [data.fixedCosts])
+  }, [data.fixedCosts, selectedMonth])
 
   const totals = useMemo(() => {
     const livingAllowance = data.settings.livingAllowanceByMonth[selectedMonth] ?? 0
@@ -941,7 +950,12 @@ function App() {
       0,
     )
     const fixedTotal = data.fixedCosts
-      .filter((cost) => cost.active && !cost.fundedMonths.includes(selectedMonth))
+      .filter(
+        (cost) =>
+          cost.active &&
+          fixedCostOccursInMonth(cost, selectedMonth) &&
+          !cost.fundedMonths.includes(selectedMonth),
+      )
       .reduce((sum, cost) => sum + cost.amount, 0)
     const baseLoanPaymentTotal = data.loans
       .filter((loan) => !loan.fundedMonths.includes(selectedMonth))
@@ -1122,6 +1136,8 @@ function App() {
       name: fixedDraft.name.trim(),
       amount,
       dueDay: clampDueDay(Number(fixedDraft.dueDay)),
+      billingCycle: fixedDraft.billingCycle,
+      dueMonth: clampDueMonth(Number(fixedDraft.dueMonth)),
       method: fixedDraft.method,
       loanId: data.loans.find((l) => l.name === fixedDraft.method)?.id || undefined,
       active: true,
@@ -1139,6 +1155,8 @@ function App() {
       name: '',
       amount: '',
       dueDay: '1',
+      billingCycle: 'monthly',
+      dueMonth: String(Number(selectedMonth.slice(5, 7))),
       method: paymentMethods[0],
       loanId: '',
       genre: 'その他',
@@ -1213,6 +1231,10 @@ function App() {
                 patch.amount === undefined ? cost.amount : clampPositive(patch.amount),
               dueDay:
                 patch.dueDay === undefined ? cost.dueDay : clampDueDay(patch.dueDay),
+              billingCycle:
+                patch.billingCycle === undefined ? cost.billingCycle : patch.billingCycle,
+              dueMonth:
+                patch.dueMonth === undefined ? cost.dueMonth : clampDueMonth(patch.dueMonth),
               loanId:
                 patch.loanId === undefined
                   ? cost.loanId
@@ -1400,10 +1422,19 @@ function App() {
         .map((e) => [e.date, e.amount, e.category, e.method, e.memo]),
       [],
       ['■ 固定費一覧'],
-      ['名前', '金額', '支払日', '支払い方法', '関連ローン', '有効'],
+      ['名前', '金額', '支払い頻度', '支払月', '支払日', '支払い方法', '関連ローン', '有効'],
       ...data.fixedCosts.map((c) => {
         const loan = data.loans.find((l) => l.id === c.loanId)
-        return [c.name, c.amount, c.dueDay, c.method, loan?.name ?? '', c.active ? '有効' : '停止']
+        return [
+          c.name,
+          c.amount,
+          c.billingCycle === 'annual' ? '年1回' : '毎月',
+          c.billingCycle === 'annual' ? c.dueMonth : '',
+          c.dueDay,
+          c.method,
+          loan?.name ?? '',
+          c.active ? '有効' : '停止',
+        ]
       }),
       [],
       ['■ ローン一覧'],
@@ -2633,6 +2664,41 @@ function App() {
                       />
                     </label>
                   </div>
+                  <div className="inline-fields">
+                    <label>
+                      <span>支払い頻度</span>
+                      <select
+                        value={fixedDraft.billingCycle}
+                        onChange={(event) =>
+                          setFixedDraft((current) => ({
+                            ...current,
+                            billingCycle: event.target.value as 'monthly' | 'annual',
+                          }))
+                        }
+                      >
+                        <option value="monthly">毎月</option>
+                        <option value="annual">年1回</option>
+                      </select>
+                    </label>
+                    {fixedDraft.billingCycle === 'annual' ? (
+                      <label>
+                        <span>支払月</span>
+                        <select
+                          value={fixedDraft.dueMonth}
+                          onChange={(event) =>
+                            setFixedDraft((current) => ({
+                              ...current,
+                              dueMonth: event.target.value,
+                            }))
+                          }
+                        >
+                          {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                            <option key={month} value={month}>{month}月</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : <span />}
+                  </div>
                   <label>
                     <span>支払い方法</span>
                     <select
@@ -2671,13 +2737,15 @@ function App() {
 
                 <div className="simulator">
                   <div>
-                    <span>有効合計</span>
+                    <span>{monthLabel(selectedMonth)}の固定費</span>
                     <strong>{yen(totals.fixedTotal)}</strong>
                   </div>
                   <div>
                     <span>件数</span>
                     <strong>
-                      {data.fixedCosts.filter((c) => c.active).length}件
+                      {data.fixedCosts.filter(
+                        (c) => c.active && fixedCostOccursInMonth(c, selectedMonth),
+                      ).length}件
                       {data.fixedCosts.some((c) => !c.active)
                         ? ` / 停止中${data.fixedCosts.filter((c) => !c.active).length}件`
                         : ''}
@@ -2697,7 +2765,9 @@ function App() {
                     <div className="item-list plan-list" style={{ gap: 12 }}>
                       {orderedGenres.map((genre) => {
                         const genreCosts = grouped[genre]
-                        const activeGenreCosts = genreCosts.filter((cost) => cost.active)
+                        const activeGenreCosts = genreCosts.filter(
+                          (cost) => cost.active && fixedCostOccursInMonth(cost, selectedMonth),
+                        )
                         const activeGenreTotal = activeGenreCosts.reduce(
                           (sum, cost) => sum + cost.amount,
                           0,
@@ -2716,6 +2786,7 @@ function App() {
                                 const relatedLoan = data.loans.find((loan) => loan.id === cost.loanId)
                                 const isFixedExpanded = expandedFixedIds.has(cost.id)
                                 const isFixedFunded = cost.fundedMonths.includes(selectedMonth)
+                                const occursThisMonth = fixedCostOccursInMonth(cost, selectedMonth)
                                 return (
                                   <li key={cost.id} className="stacked-item">
                                     <div className="item-row">
@@ -2732,8 +2803,21 @@ function App() {
                                         className={isFixedFunded ? 'check-button funded-button active' : 'check-button funded-button'}
                                         type="button"
                                         onClick={() => toggleFixedFunded(cost.id)}
-                                        aria-label={isFixedFunded ? '充当済み（取り消し）' : '今月は充当済みにする'}
-                                        title={isFixedFunded ? '充当済み：今月の収支から除外中（クリックで取り消し）' : '充当済み：今月の収支計算から除外する'}
+                                        disabled={!occursThisMonth}
+                                        aria-label={
+                                          !occursThisMonth
+                                            ? '今月は支払月ではありません'
+                                            : isFixedFunded
+                                              ? '充当済み（取り消し）'
+                                              : '今月は充当済みにする'
+                                        }
+                                        title={
+                                          !occursThisMonth
+                                            ? '今月は支払月ではありません'
+                                            : isFixedFunded
+                                              ? '充当済み：今月の収支から除外中（クリックで取り消し）'
+                                              : '充当済み：今月の収支計算から除外する'
+                                        }
                                       >
                                         <PiggyBank size={17} />
                                       </button>
@@ -2741,12 +2825,15 @@ function App() {
                                         <span>
                                           {cost.name}
                                           {isFixedFunded ? <span className="funded-badge">充当済み</span> : null}
+                                          {!occursThisMonth ? <span className="schedule-badge">今月対象外</span> : null}
                                           {cost.isInvestment ? <span className="invest-badge">投資</span> : null}
                                           {cost.noAlternative ? <span className="invest-badge" style={{ background: '#f0e8ff', borderColor: '#c4a0f0', color: '#5b2da0' }}>代替不可</span> : null}
                                         </span>
                                         <strong className={isFixedFunded ? 'muted-text' : ''}>{yen(cost.amount)}</strong>
                                         <small>
-                                          毎月{cost.dueDay}日 / {cost.method}
+                                          {cost.billingCycle === 'annual'
+                                            ? `年1回・${cost.dueMonth}月${cost.dueDay}日`
+                                            : `毎月${cost.dueDay}日`} / {cost.method}
                                           {relatedLoan ? ` / ${relatedLoan.name}` : ''}
                                         </small>
                                       </div>
@@ -2796,6 +2883,35 @@ function App() {
                                             onChange={(event) => updateFixedCost(cost.id, { amount: Number(event.target.value) })}
                                           />
                                         </label>
+                                        <label className="mini-field">
+                                          <span>支払い頻度</span>
+                                          <select
+                                            value={cost.billingCycle}
+                                            onChange={(event) =>
+                                              updateFixedCost(cost.id, {
+                                                billingCycle: event.target.value as 'monthly' | 'annual',
+                                              })
+                                            }
+                                          >
+                                            <option value="monthly">毎月</option>
+                                            <option value="annual">年1回</option>
+                                          </select>
+                                        </label>
+                                        {cost.billingCycle === 'annual' ? (
+                                          <label className="mini-field">
+                                            <span>支払月</span>
+                                            <select
+                                              value={cost.dueMonth}
+                                              onChange={(event) =>
+                                                updateFixedCost(cost.id, { dueMonth: Number(event.target.value) })
+                                              }
+                                            >
+                                              {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                                                <option key={month} value={month}>{month}月</option>
+                                              ))}
+                                            </select>
+                                          </label>
+                                        ) : null}
                                         <label className="mini-field">
                                           <span>支払日</span>
                                           <input

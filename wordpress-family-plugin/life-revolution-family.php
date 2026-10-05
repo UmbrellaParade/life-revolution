@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Life Revolution Family
  * Description: Combines two private Life Revolution ledgers into a household dashboard.
- * Version: 0.2.1
+ * Version: 0.2.2
  * Author: Umbrella Parade
  * License: GPL-2.0-or-later
  * Text Domain: life-revolution-family
@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LIFE_REVOLUTION_FAMILY_VERSION', '0.2.1');
+define('LIFE_REVOLUTION_FAMILY_VERSION', '0.2.2');
 define('LIFE_REVOLUTION_FAMILY_CAPABILITY', 'view_life_revolution_family');
 define('LIFE_REVOLUTION_FAMILY_MEMBERS_OPTION', 'life_revolution_family_members_v1');
 define('LIFE_REVOLUTION_FAMILY_VERSION_OPTION', 'life_revolution_family_installed_version');
@@ -269,6 +269,12 @@ function life_revolution_family_summary(int $user_id, string $month): array {
     $fixed_genres = array();
     foreach ($fixed_costs as $fixed_cost) {
         if (!is_array($fixed_cost) || empty($fixed_cost['active'])) {
+            continue;
+        }
+
+        $billing_cycle = (string) ($fixed_cost['billingCycle'] ?? 'monthly');
+        $due_month = min(max((int) ($fixed_cost['dueMonth'] ?? 1), 1), 12);
+        if ($billing_cycle === 'annual' && (int) substr($month, 5, 2) !== $due_month) {
             continue;
         }
 
